@@ -303,11 +303,24 @@
     }
     return out;
   }
+  // Why a read came back with zero SysEx frames. Chromium 152 breaks SysEx in both
+  // directions while channel messages still pass (see env_check.js), so the pedal
+  // looks connected and every read times out — name that before blaming the
+  // cable or Valeton Suite, which is what this message used to do unconditionally.
+  function noReplyMessage() {
+    const browser = root.EnvCheck && root.EnvCheck.sysexBrokenMessage();
+    return browser || "no reply from the pedal — close Valeton Suite if it's open, and check the USB cable";
+  }
   async function handleSync() {
     if (!(await ensureConnected())) return J({ ok: false, error: "no device connected" });
     try {
-      const snaptone = parseCatalog(await Bridge.readBankBlob(0x24));
-      const ir = parseIrBank(await Bridge.readBankBlob(0x20));
+      const snaptoneBlob = await Bridge.readBankBlob(0x24);
+      const irBlob = await Bridge.readBankBlob(0x20);
+      // Both selectors always answer on a working link; two empty blobs means the
+      // SysEx never got through, not an empty device.
+      if (!snaptoneBlob.length && !irBlob.length) return J({ ok: false, error: noReplyMessage() });
+      const snaptone = parseCatalog(snaptoneBlob);
+      const ir = parseIrBank(irBlob);
       store.bankMap = { source: "live device read (WebMIDI selectors 0x24 + 0x20)", snaptone, ir };
       store.lib = PatchLib.make(store.ring, store.bankMap, store.profile); // refresh names
       invalidate();
@@ -332,7 +345,7 @@
         // answered the catalog request at all (a different app has the port, the
         // cable's out, or the port went stale) — no slot was even attempted.
         if (!names.length) {
-          throw new Error("no reply from the pedal — close Valeton Suite if it's open, and check the USB cable");
+          throw new Error(noReplyMessage());
         }
         scanState.total = names.length;
         for (const { slot, name } of names) {

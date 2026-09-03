@@ -7,18 +7,53 @@
  * clear, dismissible modal instead of a broken-looking page. Browsing/converting
  * still work, so the modal never blocks; it just sets expectations.
  *
+ * Chromium 152 is a third case: it has WebMIDI, but its UMP SysEx7 conversion
+ * stuffs the F0/F7 framing bytes into the data payload, so every SysEx reaches
+ * the pedal as `F0 F0 ... F7 F7` and is ignored, and every SysEx reply is dropped
+ * before it reaches the page (issue #3; same regression Morningstar reported).
+ * Channel messages still pass, so the pedal looks "connected" while every read
+ * times out. Nothing the app can send survives it (send() rejects any other
+ * framing), so the only fix is a browser that isn't 152.
+ *
  * Self-contained (no deps), theme-aware via the app's CSS vars with fallbacks.
- * Test the modal without a second browser: ?envtest=browser or ?envtest=insecure.
+ * Test the modal without a second browser: ?envtest=browser, ?envtest=insecure,
+ * or ?envtest=chrome152. The detector is exported as window.EnvCheck for the
+ * device layer (static_api.js) to name the real cause on a silent read.
  */
-(function () {
+(function (root) {
+  // Chromium major version from userAgentData (Chrome 90+, undefined in Node/
+  // Firefox/Safari), falling back to the UA string. null when not Chromium.
+  function chromiumMajor(nav) {
+    const n = nav || (typeof navigator !== "undefined" ? navigator : null);
+    if (!n) return null;
+    const brands = n.userAgentData && Array.isArray(n.userAgentData.brands) ? n.userAgentData.brands : [];
+    const hit = brands.find((b) => b && b.brand === "Chromium");
+    if (hit) { const v = parseInt(hit.version, 10); return Number.isFinite(v) ? v : null; }
+    const m = /(?:Chrome|Chromium|Edg)\/(\d+)/.exec(n.userAgent || "");
+    return m ? parseInt(m[1], 10) : null;
+  }
+  const BROKEN_SYSEX_MAJORS = [152];
+  // Message naming the browser bug, or null when the browser is fine.
+  function sysexBrokenMessage(nav) {
+    const v = chromiumMajor(nav);
+    if (v === null || !BROKEN_SYSEX_MAJORS.includes(v)) return null;
+    return `Chrome ${v} can't exchange SysEx with the pedal (a Web MIDI regression in Chrome ${v}: replies never arrive). Update to Chrome 153 or newer, or use Chrome Beta/Canary.`;
+  }
+  root.EnvCheck = { chromiumMajor, sysexBrokenMessage, BROKEN_SYSEX_MAJORS };
+
+  if (typeof document === "undefined" || typeof location === "undefined") return; // Node (tests)
+
   const q = (() => { try { return new URLSearchParams(location.search); } catch { return new Map(); } })();
   const forced = q.get && q.get("envtest");
 
   const hasMIDI = typeof navigator.requestMIDIAccess === "function" && forced !== "browser";
   const isLocal = ["localhost", "127.0.0.1", "[::1]", "::1"].includes(location.hostname);
   const insecure = (!window.isSecureContext && !isLocal) || forced === "insecure";
+  const brokenSysex = hasMIDI && !insecure && (forced === "chrome152"
+    ? sysexBrokenMessage({ userAgentData: { brands: [{ brand: "Chromium", version: "152" }] } })
+    : sysexBrokenMessage());
 
-  if (hasMIDI && !insecure) return; // supported + secure — nothing to warn
+  if (hasMIDI && !insecure && !brokenSysex) return; // supported + secure — nothing to warn
 
   const CSS = `
     #env-check .ec-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); z-index: 9998; }
@@ -44,6 +79,11 @@
     <p>This browser doesn't support <b>WebMIDI</b>, so connecting to the pedal — <b>Connect</b>, <b>Live edit</b>, <b>Write</b> — won't work here.</p>
     <p>Use desktop <b>Google Chrome</b> or <b>Microsoft Edge</b>.</p>
     <p class="ec-sub">You can still browse and convert presets in this browser.</p>`;
+  const chromeBody = `
+    <h2>This Chrome version can't talk to the pedal</h2>
+    <p><b>Chrome 152</b> has a Web MIDI bug that corrupts SysEx framing, so the pedal ignores every request and <b>Scan</b>, <b>Live edit</b> and <b>Write</b> all time out with "no reply" — even though the pedal shows as connected.</p>
+    <p>Update to <b>Chrome 153 or newer</b> (Google fixed it there), or use Chrome Beta/Canary in the meantime.</p>
+    <p class="ec-sub">Nothing the app can send gets past this; it isn't the cable, the firmware, or Valeton Suite. You can still browse and convert presets here.</p>`;
 
   function show() {
     if (document.getElementById("env-check")) return;
@@ -55,7 +95,7 @@
     wrap.innerHTML = `
       <div class="ec-backdrop"></div>
       <div class="ec-card" role="dialog" aria-modal="true" aria-label="Compatibility notice">
-        ${insecure ? insecureBody : browserBody}
+        ${insecure ? insecureBody : brokenSysex ? chromeBody : browserBody}
         <div class="ec-actions">
           ${insecure ? '<button class="ec-btn ec-primary" data-act="https">Switch to https</button>' : ""}
           <button class="ec-btn" data-act="dismiss">${insecure ? "Stay on http" : "Continue anyway"}</button>
@@ -71,4 +111,4 @@
 
   if (document.body) show();
   else document.addEventListener("DOMContentLoaded", show);
-})();
+})(typeof self !== "undefined" ? self : this);

@@ -95,6 +95,11 @@ Then open **http://127.0.0.1:8756**.
 - **Preset Explorer / Captures & IRs:** connect the pedal over WebMIDI (Chrome/Edge,
   HTTPS or localhost), scan, and browse/edit real device data live — see the
   itemized feature list above.
+  - **Known issue: Chrome 152 cannot talk to the pedal.** Chrome 152 has a Web MIDI
+    regression that corrupts SysEx framing (the pedal receives `F0 F0 … F7 F7` and
+    ignores it; replies are dropped). The pedal shows as connected but every scan
+    fails with "no reply". Use Chrome 153 or newer, or Chrome Beta/Canary. Not a
+    firmware or cable problem; see [issue #3](https://github.com/drewmerc302/valeton-gp50/issues/3).
 - **Preset Converter:** drop in a `.prst` and convert between GP-5 and GP-50 formats.
 - **NAM converter:** present in the local build only, and only with the engine venv
   above. The hosted build links to the standalone converter instead.
