@@ -34,6 +34,23 @@ Everything above runs client-side. The live demo is the whole app; the local Fas
 server ([Setup](#setup)) is only for development and for the legacy in-repo NAM
 converter.
 
+## Maintenance status: no test hardware
+
+I sold my GP-50 in September 2026 and no longer own a Valeton pedal. The app was
+developed and tested against a real GP-50 and still works, but I can't reproduce
+device-side bugs myself anymore, so a fix depends on what you send. Changes to the device
+read/write path are now checked against the test suite only, not a live pedal.
+
+If you open an issue about talking to the pedal, please include:
+
+- Your browser and its exact version (from `chrome://version`), plus your OS
+- Pedal model (GP-50 or GP-5) and firmware version
+- What you did, what you expected, and what happened (screenshots help)
+- The browser console output (DevTools → Console) from the failing action
+- If you can, a raw MIDI capture of the failure, e.g. with
+  [MIDI Monitor](https://www.snoize.com/midimonitor/) on macOS. This is the single most
+  useful thing you can attach.
+
 ## Getting NAM captures onto the pedal
 
 **That moved to its own project:
