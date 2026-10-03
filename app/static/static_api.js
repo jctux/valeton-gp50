@@ -9,10 +9,11 @@
  * to the real fetch. The Explorer's own code is untouched — it still "calls the
  * backend"; the backend is just in the page now.
  *
- * The store belongs to ONE device profile (gp50 | gp5 | gp150): its codec
- * (PRST.codecFor), ring, slot count and bytes. Whenever a pedal is connected the
- * store is switched to that pedal's profile first (switchProfile), so one device's
- * bytes are never shown or written as another's.
+ * The store belongs to ONE device profile: the bundle's (gp50, from presets.json)
+ * or the GP-150's. A connected GP-150 switches the store to gp150 before any
+ * handler touches bytes, and leaving a GP-150 switches back to the bundle profile
+ * (switchProfile), so GP-150 and GP-5/GP-50 bytes are never mixed. GP-5/GP-50
+ * owners never leave the bundle profile — exactly the pre-GP-150 behaviour.
  */
 (function (root) {
   const STATIC = (() => {
@@ -72,11 +73,14 @@
   let loading = null;
   let switching = null; // { key, promise } while a profile switch is building its store
 
-  const detectKey = (u8) => { try { return PRST.detect(u8).key; } catch { return null; } };
+  // Only the GP-150 (the "ht" transport) gets its own store; every other pedal
+  // stays on the bundle's profile, as before the GP-150 existed.
+  const isHtKey = (key) => !!(PRST.DEVICES[key] && PRST.DEVICES[key].transport === "ht");
+  const bundleKey = (snap) => (snap && snap.device) || "gp50";
 
   // A store for one device profile: the bundled snapshot only if it is that
-  // device's, overlaid with the localStorage scan cache only if it is that
-  // device's. Anything else starts empty (a scan fills it).
+  // device's, overlaid with the localStorage scan cache only if it is filed under
+  // that device. Anything else starts empty (a scan fills it).
   async function buildStore(profile, snap) {
     const codec = PRST.codecFor(profile);
     const ringRes = await realFetch(dataUrl(profile.ringFile));
@@ -89,7 +93,7 @@
     const savedBankMap = lsGet(LS_BANKMAP, null);
     if (savedBankMap && savedBankMap.profileKey === profile.key && savedBankMap.bankMap) bankMap = savedBankMap.bankMap;
     const bytes = new Map(), names = new Map();
-    if (snap && (snap.device || "gp50") === profile.key) {
+    if (bundleKey(snap) === profile.key) {
       for (const p of snap.presets) { bytes.set(p.slot, b64ToBytes(p.b64)); names.set(p.slot, p.name); }
     }
     // Overlay any real device reads we've cached locally, so a reload shows the
@@ -97,20 +101,10 @@
     // scanned in a prior visit.
     const cache = lsGet(LS_SCAN, null);
     let cachedCount = 0;
-    if (cache && cache.slots) {
-      let mine = cache.profileKey === profile.key;
-      // Before profiles switched, every read was filed under the bundle's key
-      // ("gp50") — a GP-5's included. Adopt such a cache (and relabel it) only
-      // when every entry's bytes really are this device's.
-      const entries = Object.values(cache.slots);
-      if (!mine && entries.length && entries.every((e) => { try { return detectKey(b64ToBytes(e.b64)) === profile.key; } catch { return false; } })) {
-        mine = true; cache.profileKey = profile.key; lsSet(LS_SCAN, cache);
-      }
-      if (mine) {
-        for (const [slotStr, entry] of Object.entries(cache.slots)) {
-          try { bytes.set(Number(slotStr), b64ToBytes(entry.b64)); names.set(Number(slotStr), entry.name); cachedCount++; }
-          catch { /* corrupt cache entry — skip it, keep the bundle default */ }
-        }
+    if (cache && cache.profileKey === profile.key && cache.slots) {
+      for (const [slotStr, entry] of Object.entries(cache.slots)) {
+        try { bytes.set(Number(slotStr), b64ToBytes(entry.b64)); names.set(Number(slotStr), entry.name); cachedCount++; }
+        catch { /* corrupt cache entry — skip it, keep the bundle default */ }
       }
     }
     return { profile, codec, ring, bankMap, lib: PatchLib.make(ring, bankMap, profile), bytes, names, cachedCount, snap };
@@ -121,20 +115,23 @@
     if (loading) return loading;
     loading = (async () => {
       const snap = await realFetch(dataUrl("presets.json")).then((r) => r.json());
-      // Boot into the profile of the last scan (a GP-150 owner reloading the page
-      // sees their GP-150 presets, not the GP-50 bundle); else the bundle's.
-      const cache = lsGet(LS_SCAN, null), bundleKey = snap.device || "gp50";
-      const key = cache && cache.profileKey && PRST.DEVICES[cache.profileKey] ? cache.profileKey : bundleKey;
+      // A GP-150 owner reloading the page boots into their cached GP-150 scan, not
+      // the GP-50 bundle. Everyone else boots into the bundle's profile, as always.
+      const cache = lsGet(LS_SCAN, null), base = bundleKey(snap);
+      const key = cache && isHtKey(cache.profileKey) ? cache.profileKey : base;
       try { store = await buildStore(PRST.profileFor(key), snap); }
-      catch (e) { if (key === bundleKey) throw e; store = await buildStore(PRST.profileFor(bundleKey), snap); }
+      catch (e) { if (key === base) throw e; store = await buildStore(PRST.profileFor(base), snap); }
       return store;
     })();
     return loading;
   }
 
-  // Rebuild the store for another device profile (no-op when already on it).
-  async function switchProfile(key) {
+  // Rebuild the store for the connected pedal `deviceKey`. Only switches to or from
+  // the GP-150: a GP-5/GP-50 maps to the bundle profile, so with the store already
+  // on it nothing changes (no-op when already on the target).
+  async function switchProfile(deviceKey) {
     await ensureLoaded();
+    const key = isHtKey(deviceKey) ? deviceKey : bundleKey(store.snap);
     if (store.profile.key === key) return store;
     if (switching && switching.key === key) return switching.promise;
     const promise = buildStore(PRST.profileFor(key), store.snap).then(
@@ -152,16 +149,16 @@
   const slotOk = (slot) => Number.isInteger(slot) && slot >= 0 && slot < store.profile.slots;
 
   // --- device I/O helpers (WebMIDI) ------------------------------------------
-  // Connected => the store is switched to the connected pedal's profile before any
-  // handler touches bytes. A failed switch throws: better no answer than one
-  // device's presets filed under another.
+  // Connected => the store matches the connected pedal (GP-150 store for a GP-150,
+  // the bundle store otherwise) before any handler touches bytes. A failed switch
+  // throws: better no answer than one device's presets filed under another.
   async function ensureConnected() {
     if (!Bridge.connected()) {
       if (!Bridge.webmidiAvailable() || !userEngaged) return false;
       try { await Bridge.connect(); } catch { return false; }
     }
     const dev = Bridge.device();
-    if (dev && dev.key && dev.key !== store.profile.key) await switchProfile(dev.key);
+    if (dev && dev.key) await switchProfile(dev.key);
     return true;
   }
 

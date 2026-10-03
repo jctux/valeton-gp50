@@ -32,6 +32,13 @@ const lengths = () => new Set(Object.values(api.getAllSlotBytes()).map((u) => u.
 await api.ensureLoaded();
 let inv = await get("/api/device/inventory");
 check("starts as gp50 bundle", inv.device.key === "gp50" && inv.domains.patch_slots[1] === 99 && inv.device.slots === 100);
+// a GP-5 (or GP-50) keeps the upstream behaviour: the bundle's gp50 store, 100 slots
+connectedKey = "gp5";
+check("gp5 status reports the pedal", (await get("/api/device/status")).device.key === "gp5");
+inv = await get("/api/device/inventory");
+check("gp5 does not switch the store", inv.device.key === "gp50" && inv.domains.patch_slots[0] === 0 && inv.domains.patch_slots[1] === 99 && inv.patches.length === 100);
+await api.switchProfile("gp5");
+check("switchProfile(gp5) from gp50 is a no-op", (await get("/api/device/inventory")).device.key === "gp50");
 connectedKey = "gp150";
 const st = await get("/api/device/status");
 check("status switched profile", st.device.key === "gp150");
@@ -48,6 +55,15 @@ check("filled slots named from the bytes", inv.patches.find((p) => p.slot === 0)
 check("full cache", api.hasFullScanCache() === true);
 check("only GP-150 bytes in the gp150 store", [...lengths()].join() === "1128");
 
+// a GP-5 after the GP-150: back to the upstream bundle store (gp50), not a gp5 store
+connectedKey = "gp5";
+await get("/api/device/status");
+inv = await get("/api/device/inventory");
+check("gp5 after gp150 -> bundle gp50 store", inv.device.key === "gp50" && inv.domains.patch_slots[1] === 99 && [...lengths()].join() === "552");
+connectedKey = "gp150";
+await get("/api/device/status");
+check("gp150 again after gp5", (await get("/api/device/inventory")).device.key === "gp150");
+
 // back to a GP-50: the GP-150 reads must not leak into the GP-50 inventory
 connectedKey = "gp50";
 check("status switches back", (await get("/api/device/status")).device.key === "gp50");
@@ -60,6 +76,17 @@ connectedKey = "gp150";
 await get("/api/device/status");
 inv = await get("/api/device/inventory");
 check("gp150 cache restored on reconnect", inv.device.key === "gp150" && inv.patches.length === 200 && inv.patches.find((p) => p.slot === 199).empty === true);
+
+// a reload with a gp50-filed cache stays on the bundle profile (upstream behaviour)
+{
+  const saved = store["valeton_scanCache_v2"];
+  store["valeton_scanCache_v2"] = JSON.stringify({ profileKey: "gp50", slots: {} });
+  delete require.cache[apiPath]; connectedKey = null;
+  require(apiPath); api = globalThis.__staticApi;
+  await api.ensureLoaded();
+  check("gp50 cache boots the bundle profile", (await get("/api/device/inventory")).device.key === "gp50");
+  store["valeton_scanCache_v2"] = saved;
+}
 
 // a reload (fresh static_api) boots straight into the cached GP-150 profile
 delete require.cache[apiPath]; connectedKey = null;
