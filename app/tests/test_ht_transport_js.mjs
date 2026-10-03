@@ -24,6 +24,9 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const reqPayload = (w) => HT.parseLogical(HT.dec(HT.parseFrame(w).body.subarray(1)));
 const isPresetReq = (w) => w[3] === 0x0f;
 const FAST = { settleMs: 5, emptyTimeoutMs: 60, timeoutMs: 500, idleMs: 60 };
+// for pedals that do answer: a generous hard cap so CPU contention can't expire a
+// stream between chunk timers (timeoutMs only bounds a stream that keeps flowing)
+const LIVE = { ...FAST, timeoutMs: 5000 };
 
 // A fake pedal: answers hello, answers reads with the captured slot-0 export stream,
 // stays silent (after its ACK) for slot 199, logs every host frame. Knobs:
@@ -36,7 +39,8 @@ function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-
   const sent = []; const input = { name, onmidimessage: null }; let ackedFinal = 0, reads = 0;
   const deliver = (u8) => input.onmidimessage && input.onmidimessage({ data: u8 });
   const emit = (u8, ms = 1) => setTimeout(() => deliver(u8), ms);
-  const stream = (ms0 = 5) => exportChunks.forEach((c, i) => { if (i !== dropChunk) emit(c, ms0 + i * 2); });
+  // mutate(chunk, i) -> chunk lets a test corrupt one chunk of one stream
+  const stream = (ms0 = 5, mutate = null) => exportChunks.forEach((c, i) => { if (i !== dropChunk) emit(mutate ? mutate(c, i) : c, ms0 + i * 2); });
   const output = { name, send(bytes) {
     const w = Uint8Array.from(bytes); sent.push(w); const f = HT.parseFrame(w);
     if (dead) return;
@@ -59,7 +63,7 @@ const isHelloReq = (w) => w[3] === 0x00 && w[5] === 0x01;
 
 // --- brief scenario --------------------------------------------------------------
 const pedal = fakePedal();
-const s = T.create(pedal.input, pedal.output, FAST);
+const s = T.create(pedal.input, pedal.output, LIVE);
 check("hello", await s.hello() === true);
 const t0 = Date.now();
 const p0 = await s.readPreset(0);
@@ -104,7 +108,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 {
   const p = fakePedal(); const out = p.output.send.bind(p.output);
   p.output.send = (bytes) => { const w = Uint8Array.from(bytes); if (w[3] === 0x00 && w[5] === 0x01) p.deliver(MSG.ident_reply); return out(bytes); };
-  const s3b = T.create(p.input, p.output, FAST);
+  const s3b = T.create(p.input, p.output, LIVE);
   check("hello survives an unsolicited frame first", await s3b.hello() === true);
   s3b.close();
 }
@@ -125,7 +129,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
       syncAck = sent.length === before + 1 && hex(sent[before]) === hex(HT.ack(0x0c));
     }, 2);
   } };
-  const s4 = T.create(input, output, FAST);
+  const s4 = T.create(input, output, LIVE);
   const p = await s4.readPreset(0);
   check("final chunk ACK sent before the callback returns", syncAck === true);
   check("sync-fed stream assembles", p && p.length === 1128);
@@ -154,34 +158,54 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 // --- (a) the first read request is lost: re-sent, preset returned ------------------
 {
   const p = fakePedal({ onRead: ({ n, ack, stream }) => { if (n === 1) return; ack(); stream(); } });
-  const sa = T.create(p.input, p.output, FAST);
+  const sa = T.create(p.input, p.output, LIVE);
   const r = await sa.readPreset(0);
   check("lost first request -> preset", r && r.length === 1128);
   check("lost first request -> exactly 2 reads, no hello", p.reads() === 2 && !p.sent.some(isHelloReq));
   sa.close();
 }
 
-// --- (b) no ACK, stream starts just after the silence window -> preset, not null ---
+// --- (b) no ACK; read #1's stream only starts after its silence window -> preset ----
+// Event-driven: the pedal emits read #1's (un-ACKed) stream when the re-sent read
+// #2 arrives, i.e. strictly after read #1 was judged silent.
 {
-  const SLOW = { settleMs: 5, emptyTimeoutMs: 100, timeoutMs: 500, idleMs: 60, tickMs: 5 };
-  const p = fakePedal({ onRead: ({ n, stream }) => { if (n === 1) stream(150); } });
-  const sb = T.create(p.input, p.output, SLOW);
+  const p = fakePedal({ onRead: ({ n, stream }) => { if (n === 2) stream(); } });
+  const sb = T.create(p.input, p.output, LIVE);
   const r = await sb.readPreset(0);
   check("late un-ACKed stream -> preset, not null", r && r.length === 1128, String(r));
+  check("late un-ACKed stream: 2 reads, no hello", p.reads() === 2 && !p.sent.some(isHelloReq));
   sb.close();
+}
+
+// --- a stream whose first (offset-0) chunk is corrupt: retry, never "empty" --------
+{
+  const corruptFirst = (c, i) => { if (i !== 0) return c; const w = Uint8Array.from(c); w[2] ^= 0x01; return w; };
+  const p = fakePedal({ onRead: ({ n, ack, stream }) => { ack(); stream(5, n === 1 ? corruptFirst : null); } });
+  const sk = T.create(p.input, p.output, LIVE);
+  const r = await sk.readPreset(0).then((v) => v, (e) => e);
+  check("missing first chunk on read #1 -> preset on the retry", r instanceof Uint8Array && r.length === 1128, String(r && r.message || r));
+  check("missing first chunk: exactly 2 reads", p.reads() === 2, `reads=${p.reads()}`);
+  check("missing first chunk: final chunk ACKed once per stream", p.finalAcks() === 2, `finalAcks=${p.finalAcks()}`);
+  sk.close();
+  const q = fakePedal({ onRead: ({ ack, stream }) => { ack(); stream(5, corruptFirst); } });
+  const sk2 = T.create(q.input, q.output, LIVE);
+  const r2 = await sk2.readPreset(0).then((v) => ({ value: v }), (e) => e);
+  check("first chunk always corrupt -> rejects with a stream error (never null)", r2 instanceof Error && /first chunk/.test(r2.message), JSON.stringify(r2 && r2.message || r2));
+  check("first chunk always corrupt: 2 reads", q.reads() === 2, `reads=${q.reads()}`);
+  sk2.close();
 }
 
 // --- a late stream that lands during the hello probe: read again, never null --------
 {
   const p = fakePedal({ onRead: ({ n, ack, stream }) => { if (n >= 3) { ack(); stream(); } }, onHello: ({ reply, stream }) => { stream(1); reply(40); } });
-  const sp = T.create(p.input, p.output, FAST);
+  const sp = T.create(p.input, p.output, LIVE);
   const r = await sp.readPreset(0);
   check("stream during the probe -> read again -> preset", r && r.length === 1128 && p.reads() === 3, `${r && r.length} reads=${p.reads()}`);
   sp.close();
 }
 {
   const p = fakePedal({ onRead: ({ n, ack }) => { if (n >= 3) ack(); }, onHello: ({ reply, stream }) => { stream(1); reply(40); } });
-  const sp = T.create(p.input, p.output, FAST);
+  const sp = T.create(p.input, p.output, LIVE);
   const err = await sp.readPreset(0).then((v) => ({ value: v }), (e) => e);
   check("stream during the probe, then ACK + silence -> rejects (never null)", err instanceof Error, JSON.stringify(err));
   check("at most 2 reads after the probe", p.reads() === 4 && p.sent.filter(isHelloReq).length === 1, `reads=${p.reads()}`);
@@ -215,7 +239,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 // --- stream gap: one retry, then a clear error -------------------------------------
 {
   const p = fakePedal({ dropChunk: 3 });
-  const s7 = T.create(p.input, p.output, FAST);
+  const s7 = T.create(p.input, p.output, LIVE);
   const err = await s7.readPreset(0).then(() => null, (e) => e);
   check("gapped stream rejects", err instanceof Error, err && err.message);
   check("gapped stream retried once", p.sent.filter(isPresetReq).length === 2);
@@ -226,7 +250,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 // --- stale stream for another slot: retried, then accepted with a warning ----------
 {
   const p = fakePedal(); const warns = [];
-  const s8 = T.create(p.input, p.output, Object.assign({}, FAST, { log: (lvl, msg) => { if (lvl === "warn") warns.push(msg); } }));
+  const s8 = T.create(p.input, p.output, Object.assign({}, LIVE, { log: (lvl, msg) => { if (lvl === "warn") warns.push(msg); } }));
   const r = await s8.readPreset(5); // fake always answers with the index-0 preset
   check("index mismatch retried once", p.sent.filter(isPresetReq).length === 2);
   check("index mismatch accepted after retry with a warning", r && r.length === 1128 && warns.length === 1, warns.join("|"));
@@ -236,7 +260,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 // --- unsolicited device short messages are ACKed with their tx id ------------------
 {
   const p = fakePedal();
-  const s9 = T.create(p.input, p.output, FAST);
+  const s9 = T.create(p.input, p.output, LIVE);
   p.deliver(MSG.ident_reply); // family 0x10, tx 1 — arrives with no request in flight
   check("unsolicited message ACKed", p.sent.length === 1 && hex(p.sent[0]) === hex(HT.ack(1)), p.sent.map(hex).join(","));
   const bad = Uint8Array.from(MSG.ident_reply); bad[2] ^= 0x01;
@@ -249,7 +273,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
 {
   const PRST = require(resolve(root, "app/static/prst.js"));
   globalThis.self = globalThis; globalThis.PRST = PRST; globalThis.HtTransport = T;
-  const saved = Object.assign({}, T.DEFAULTS); Object.assign(T.DEFAULTS, FAST);
+  const saved = Object.assign({}, T.DEFAULTS); Object.assign(T.DEFAULTS, LIVE);
   const p150 = fakePedal({ name: "GP-150" }), p50 = fakePedal({ name: "GP-50" });
   const portMap = (...ps) => new Map(ps.map((x, i) => [String(i), x]));
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { requestMIDIAccess: async () => ({ inputs: portMap(p50.input, p150.input), outputs: portMap(p50.output, p150.output) }) } });
@@ -281,6 +305,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   D.disconnect();
   check("disconnect closes the session", !D.isConnected() && D._ht() === null);
   // a pedal that never answers the handshake must not leave a half-open connection
+  T.DEFAULTS.timeoutMs = FAST.timeoutMs; // the mute pedal's hello should time out fast
   const mute = fakePedal({ dead: true, name: "GP-150" });
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { requestMIDIAccess: async () => ({ inputs: portMap(mute.input), outputs: portMap(mute.output) }) } });
   check("silent handshake -> connect rejects", await D.connect().then(() => false, (e) => /handshake/.test(e.message)));

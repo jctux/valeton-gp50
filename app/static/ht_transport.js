@@ -89,6 +89,7 @@
       return new Promise((resolve) => {
         const frames = [], chunks = [], t0 = Date.now();
         let ack = false, ackAt = 0, lastChunkAt = 0, done = false, tick = null;
+        let sawTail = false; // non-zero-offset chunks seen with no offset-0 chunk before them
         const finish = (extra) => {
           if (done) return;
           done = true;
@@ -107,10 +108,12 @@
           if (!HT.isChunk(f)) { if (!stream && (!until || until(f))) finish(); return; } // reply / status message
           if (!stream) return;
           // offset 0 opens a stream: drop any partial leftovers (e.g. a resend), and
-          // ignore the tail of an older stream that started before this exchange.
+          // ignore a tail with no head — an older stream's, or ours with its first
+          // chunk lost (sawTail: then it is a stream error at the silence verdict,
+          // never "empty"; our own offset-0 chunk resets `chunks` before that).
           const offset = (f.tx4[1] & 0x7f) | ((f.tx4[2] & 0x7f) << 7);
           if (offset === 0) chunks.length = 0;
-          else if (!chunks.length) return;
+          else if (!chunks.length) { sawTail = true; return; }
           chunks.push(f);
           lastChunkAt = Date.now();
           if (w.length < HT.FULL_WIRE_LEN) { // final chunk (already ACKed in onMessage)
@@ -124,7 +127,9 @@
           const now = Date.now();
           if (stream) {
             if (chunks.length) { if (now - lastChunkAt > o.idleMs) finish({ error: new Error("preset stream stopped before its final chunk") }); }
-            else if (now - (ack ? ackAt : t0) > o.emptyTimeoutMs) finish({ silent: true });
+            else if (now - (ack ? ackAt : t0) > o.emptyTimeoutMs) {
+              finish(sawTail ? { error: new Error("preset stream arrived without its first chunk") } : { silent: true });
+            }
           } else if (ack && now - ackAt > o.idleMs) finish();
           if (now - t0 > timeoutMs + (stream ? o.emptyTimeoutMs : 0)) finish({ timeout: true });
         }, o.tickMs);
@@ -157,7 +162,8 @@
     //    (covers a pedal that does not ACK empty-slot reads), else NOT_RESPONDING
     //  - a chunk shows up during the probe              -> a late stream: discard it
     //    and read again (at most 2 more reads), never null on that path
-    //  - garbled / stalled / timed-out stream           -> one retry
+    //  - garbled / stalled / timed-out stream, or a     -> one retry; any chunk at
+    //    stream missing its first chunk                     all rules out null
     //  - preset index != slot (a stale resend)          -> one retry, then kept + warning
     function readPreset(slot) {
       return job(async () => {
@@ -178,6 +184,10 @@
             if (slot === HT.SLOT_ACTIVE || prst[4] === slot) return prst;
             if (mismatched) { log("warn", `slot ${slot} answered with preset index ${prst[4]} twice; keeping it`); return prst; }
             mismatched = prst; lastErr = new Error(`slot ${slot} answered with preset index ${prst[4]}`);
+            continue;
+          }
+          if (r.silent && r.frames.some((f) => HT.isChunk(f))) { // chunks came, just no usable stream: never "empty"
+            lastErr = new Error("preset stream arrived without its first chunk");
             continue;
           }
           if (r.silent && r.ack) {
