@@ -133,7 +133,7 @@ Setup: GP-150 on USB, Valeton Suite **closed**, `.venv-midi` present (see above)
 | 3c | | any `ERROR` / `[ht]` warning lines: _(fill in)_ |
 | 3d | step on a footswitch / turn the preset knob | pedal still responsive? _(fill in)_ |
 | 4 | `./.venv-midi/bin/python patch/ht_scan.py read active` again, then `cmp` it with step 2's file | identical? (reads must not change the active preset): _(fill in)_ |
-| 5 | Chrome: `./run.sh`, open `http://127.0.0.1:8756/explorer?static=1` (or the Task 10 static build), click **Scan presets from device** | progress reaches 200? wall time: _(fill in)_; names identical to the CLI scan (`device_scan_gp150/scan_summary.json`)? _(fill in)_; empty slots shown as empty? _(fill in)_ |
+| 5 | **Requires Task 10** (GP-150 ring bundled into `app/static/data/`; before that the static page fails with "could not load the GP-150 model catalog"). Chrome: `./run.sh`, open `http://127.0.0.1:8756/explorer?static=1` (or the Task 10 static build), click **Scan presets from device** | progress reaches 200? wall time: _(fill in)_; names identical to the CLI scan (`device_scan_gp150/scan_summary.json`)? _(fill in)_; empty slots shown as empty? _(fill in)_ |
 | 6 | `./.venv-midi/bin/python patch/ht_scan.py watch` while switching models on the pedal | each `(slot, type) → name` learned, and any type not yet in `gp150_type_map.json`: _(fill in)_ |
 | 7 | copy 5 **user** (non-factory) presets from `device_scan_gp150/` into `re/gp150/evidence/` | file names: _(fill in)_ |
 
