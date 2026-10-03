@@ -1,6 +1,7 @@
 /*
  * Bundle the data a zero-backend Explorer needs into app/static/data/:
- *   fxid_ring.json / fxid_ring_gp5.json  — model catalogs (copied from patch/)
+ *   fxid_ring.json / fxid_ring_gp5.json / fxid_ring_gp150.json
+ *                                        — model catalogs (copied from patch/)
  *   bank_map.json                        — SnapTone/User-IR device names (if present)
  *   presets.json                         — a preset snapshot {device, presets:[{slot,name,b64}]}
  *
@@ -27,7 +28,7 @@ const outDir = resolve(repo, "app/static/data");
 mkdirSync(outDir, { recursive: true });
 
 // model catalogs (always) + bank_map (only in --live; factory ships empty)
-for (const f of ["fxid_ring.json", "fxid_ring_gp5.json"]) {
+for (const f of ["fxid_ring.json", "fxid_ring_gp5.json", "fxid_ring_gp150.json"]) {
   const src = resolve(repo, "patch", f);
   if (existsSync(src)) copyFileSync(src, resolve(outDir, f));
   else console.warn(`(skip missing ${f})`);

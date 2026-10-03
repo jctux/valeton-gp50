@@ -2,7 +2,8 @@
 
 A browser-based editor for the **Valeton GP-50** (and GP-5), built by reverse-engineering
 the pedal's MIDI SysEx protocol from scratch. It reads and writes the device live over
-**WebMIDI** — no vendor SDK, no drivers, no backend.
+**WebMIDI** — no vendor SDK, no drivers, no backend. The **GP-150** can be read but not
+yet written ([GP-150](#gp-150-read-only-for-now)).
 
 **Live demo:** [valeton-gp50-woad.vercel.app](https://valeton-gp50-woad.vercel.app) —
 zero-setup, runs entirely in-browser. Chrome or Edge, pedal on USB.
@@ -34,6 +35,68 @@ Everything above runs client-side. The live demo is the whole app; the local Fas
 server ([Setup](#setup)) is only for development and for the legacy in-repo NAM
 converter.
 
+## GP-150 (read-only for now)
+
+The Explorer can also read a **Valeton GP-150**. The GP-150 doesn't speak the GP-5/GP-50
+protocol, so it has its own preset codec (`app/static/prst150.js`,
+`patch/prst150_format.py`) and its own MIDI transport (`app/static/ht_proto.js` +
+`ht_transport.js`, `patch/ht_proto.py`). The rest of the app picks them up through the
+device profile.
+
+**Supported:**
+
+- **Scan and browse all 200 preset slots**: name, the **12-block** chain (NR, PRE, WAH,
+  DST, N→S, AMP, CAB, EQ, MOD, DLY, RVB, VOL) in its stored order, models and parameters.
+  A slot that stays silent is shown as empty. The GP-150 has no known bulk name read,
+  so a scan reads one slot at a time and is slower than a GP-50 scan.
+- **AMP is locked first.** The pedal keeps AMP at chain position 0. The chain view pins
+  it there, and the codec refuses any block order that doesn't start with AMP.
+- **Back up / export**: **⬇ Download edited .prst** with no edits saves the preset as
+  its 1128-byte `.prst`, byte-for-byte what the pedal sent. Browser edits download the
+  same way, but no edited GP-150 file has been loaded on a pedal yet.
+- **Model names** come from a prebuilt GP-150 catalog (`patch/fxid_ring_gp150.json`).
+  `patch/build_ring.py gp150` regenerates it from the public format notes plus a local
+  Valeton Suite install; Valeton's `module150_data.json` itself is never committed. A
+  type code that isn't mapped yet shows as `Type <n>`.
+
+**Not yet:**
+
+- **Writing to the pedal is not available yet.** Rename, parameter and bypass edits,
+  live edit, block or preset reorder, Clear Preset and every other write can't reach a
+  GP-150. Every write path refuses (`WRITE_VERIFIED["gp150"] = False`) until the import
+  stream has been verified on hardware.
+- **SnapTone / IR catalog**: the request that reads the GP-150's capture and IR names
+  hasn't been decoded, so the Captures & IRs features (names, usage lookup, build from
+  a capture) are GP-5/GP-50 only for now.
+- **Conversion**: the Preset Converter refuses GP-150 files (different effect catalog).
+  GP-5 ↔ GP-50 conversion is unchanged.
+
+**Using it:** Chrome or Edge, GP-150 on **USB** (Bluetooth isn't supported). **Close
+Valeton Suite if the handshake fails**: it holds the MIDI port. If it still fails,
+unplug and replug the USB cable. The GP-150 path runs in the backend-free static mode,
+so use the static build (`node scripts/build_static_data.mjs && node
+scripts/build_static_site.mjs`, then serve `dist/`) or, on the local server, open
+`http://127.0.0.1:8756/explorer?static=1`. The FastAPI backend's device routes are
+GP-5/GP-50 only. Then click **Scan device**. The Chrome 152 known issue under
+[Run](#run) is a Web MIDI SysEx bug, so expect it to hit the GP-150 too.
+
+**How it was reverse-engineered:** the GP-150 ignores the GP-5/GP-50 requests and the
+Universal Device Inquiry. It speaks the GP-180's "HT" SysEx protocol, which
+[majabojarska/Valeton-GP180-Rev-Eng](https://github.com/majabojarska/Valeton-GP180-Rev-Eng)
+captured from Valeton Suite. The framing, both CRCs, the preset-read request and the
+chunked reply stream were worked out from that capture corpus. The 1128-byte preset
+layout comes from the public
+[GP150_PRST_FORMAT.md](https://gist.github.com/AlbertoBarba/ec59feecba60ca956eeb6970f0ac0055)
+analysis. The read path (handshake, preset read, chunk stream, and the immediate ACK of
+the final chunk that the pedal needs) was verified against a real GP-150 over USB with
+throwaway probe scripts during reverse-engineering. The probes are in `re/gp150/probes/`,
+and their logs plus three presets read off the pedal are in `re/gp150/evidence/`. The
+app's own scanners (the browser scan and the `patch/ht_scan.py` CLI) have only been
+tested against a simulated pedal so far: **the full 200-slot scan and the Chrome
+checklist in [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md) are still pending.**
+Details: [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md) (wire facts, read rules,
+CLI) and the [design spec](docs/superpowers/specs/2026-10-03-gp150-support-design.md).
+
 ## Maintenance status: no test hardware
 
 I sold my GP-50 in September 2026 and no longer own a Valeton pedal. The app was
@@ -44,7 +107,7 @@ read/write path are now checked against the test suite only, not a live pedal.
 If you open an issue about talking to the pedal, please include:
 
 - Your browser and its exact version (from `chrome://version`), plus your OS
-- Pedal model (GP-50 or GP-5) and firmware version
+- Pedal model (GP-50, GP-5 or GP-150) and firmware version
 - What you did, what you expected, and what happened (screenshots help)
 - The browser console output (DevTools → Console) from the failing action
 - If you can, a raw MIDI capture of the failure, e.g. with
@@ -146,6 +209,7 @@ Then open **http://127.0.0.1:8756**.
 ## Scope
 
 Live device read/write (Explorer, live edit, reorder, rename, clear, capture usage,
-build/make-template) is reverse-engineered and working over WebMIDI. The app only
+build/make-template) is reverse-engineered and working over WebMIDI. The GP-150 is
+read-only for now ([GP-150](#gp-150-read-only-for-now)). The app only
 talks to the physical pedal when you explicitly connect and scan/write via the
 Explorer or Captures & IRs pages.

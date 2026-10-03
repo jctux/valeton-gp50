@@ -68,3 +68,9 @@ def test_static_style_css_served():
     resp = client.get("/static/style.css")
     assert resp.status_code == 200
     assert "text/css" in resp.headers["content-type"]
+
+
+def test_explorer_loads_gp150_modules_in_order():
+    html = client.get("/explorer").text
+    order = [html.index(s) for s in ("prst.js", "prst150.js", "patchlib.js", "ht_proto.js", "ht_transport.js", "webmidi_device.js")]
+    assert order == sorted(order), "GP-150 scripts must load after prst.js and before webmidi_device.js"

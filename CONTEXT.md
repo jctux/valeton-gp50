@@ -4,18 +4,36 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
 
 ## Domain
 
-- **Device** — the GP-5 or the GP-50. Siblings: same .prst container, same
-  SysEx protocol, same effect catalog (GP-5's is a strict subset of the GP-50's).
-  A **device profile** (`prst_format.DeviceProfile`, keys `gp5`/`gp50`) carries
-  the three things that differ: 20-byte header, .prst length (507 vs 552), and
-  the 0xFF-block device tag. `prst_format.detect()` identifies a .prst's device.
+- **Device** — the GP-5, the GP-50 or the GP-150 (below). The GP-5 and GP-50 are
+  siblings: same .prst container, same SysEx protocol, same effect catalog (GP-5's
+  is a strict subset of the GP-50's). A **device profile**
+  (`prst_format.DeviceProfile`, keys `gp5`/`gp50`/`gp150`) carries the three things
+  that differ between the siblings: 20-byte header, .prst length (507 vs 552), and
+  the 0xFF-block device tag; plus `slots`/`transport`/`n_blocks` (100/"legacy"/10
+  for both siblings). `prst_format.detect()` identifies a .prst's device.
   Reads/scans/conversions work on both. Device WRITE is capture-verified only for
   the GP-50 (`device_write.WRITE_VERIFIED`); a GP-5 write reuses the GP-50 opcodes
   on faith and is gated behind `allow_unverified` until a GP-5 import is captured.
-- **Patch** — one device preset slot (index 0–99). Serialized as a **.prst**
-  file (layout: `patch/prst_format.py`; 552 B on GP-50, 507 B on GP-5). A patch
-  whose name is the factory default (the device name, `"GP-50"` / `"GP-5"`) is
-  an **empty slot** (safe write target).
+- **GP-150** — the third device (`prst_format.GP150`: 200 slots, transport `"ht"`,
+  12 blocks). Not a GP-5/GP-50 sibling. **Container**: 1128 B, magic `11 30 64 04`,
+  layout in `patch/prst150_format.py` / `app/static/prst150.js` (the "codec";
+  callers get it from `PRST.codecFor(profile)`). **Protocol**: the GP-180 "HT"
+  SysEx protocol (`patch/ht_proto.py` / `app/static/ht_proto.js`, browser session
+  `ht_transport.js`, read-only CLI `patch/ht_scan.py`; see `re/gp150/DEVICE_READ.md`).
+  No bulk name read: a scan reads every slot, and a slot that stays silent is
+  **empty** (stored as a nameless blank). **12 block slots** 0–11 named NR PRE WAH
+  DST N→S AMP CAB EQ MOD DLY RVB VOL. Blocks are stored in chain order, and the
+  12-byte order at 0x78 lists slot indices. **AMP (slot 5) is locked at chain
+  position 0**: the codec refuses any order that doesn't start with it. A block names
+  its model by `(slot, type)`, where type is a per-slot enumeration (not an fxid low
+  byte). The ring `patch/fxid_ring_gp150.json` is keyed **`(slot << 24) | type`**;
+  an engine-0x06 block is the "None" effect. **Read-only**:
+  `WRITE_VERIFIED["gp150"] = False` until the import stream is verified on
+  hardware. No conversion to or from the GP-5/GP-50.
+- **Patch** — one device preset slot (index 0–99; 0–199 on the GP-150). Serialized
+  as a **.prst** file (layout: `patch/prst_format.py`; 552 B on GP-50, 507 B on
+  GP-5; GP-150 above). A patch whose name is the factory default (the device
+  name, `"GP-50"` / `"GP-5"`) is an **empty slot** (safe write target).
 - **Preset conversion (GP-5 ↔ GP-50)** — reshaping a .prst between devices
   (`patch/convert.py`). Not an effect transcode: the 390-byte 0x02 tone block +
   name + VOL/BPM/footswitches are portable and rewrapped in the target skeleton.
@@ -33,9 +51,10 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
   patch from a capture** = stamp a template onto a SnapTone (repoint its N→S,
   refix CRC) and write the result to a slot.
 - **Block** — one of the 10 chain positions (NR PRE DST AMP CAB EQ MOD DLY RVB
-  N→S). A block references a **model** by fxid = (category << 24) | fxlow; the
-  decoded catalog is per-device (`patch/fxid_ring.json` for GP-50,
-  `patch/fxid_ring_gp5.json` for GP-5), both built by `patch/build_ring.py`.
+  N→S; the GP-150 has 12, see above). A block references a **model** by
+  fxid = (category << 24) | fxlow; the decoded catalog is per-device
+  (`patch/fxid_ring.json` for GP-50, `patch/fxid_ring_gp5.json` for GP-5), both
+  built by `patch/build_ring.py`.
 - **Block-library entry** — one saved block (model + params), the block-level
   sibling of a template. Stored in block_library.json.
 - **bank_map** — `patch/bank_map.json`: authoritative device names for
@@ -51,7 +70,8 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
 
 - **prst_format** (`patch/prst_format.py`) — the .prst byte layout: offsets,
   CRC-8/0x07, name codec, record magics, rebuild(), plus the device profiles
-  (GP-5/GP-50) and detect(). The only module allowed to know offsets.
+  (GP-5/GP-50/GP-150) and detect(). The only module allowed to know GP-5/GP-50
+  offsets; GP-150 offsets live in `prst150_format` (JS mirror `prst150.js`).
   Golden-file tested against presetExports/ and the GP-5 fixtures.
 - **convert** (`patch/convert.py`) — GP-5 ↔ GP-50 preset reshaping (see the
   domain term). stdlib-only; round-trip tested against both corpora.
