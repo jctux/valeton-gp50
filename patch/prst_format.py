@@ -1,4 +1,4 @@
-"""The 552-byte GP-50 .prst format — single source of truth.
+"""The .prst format — single source of truth (GP-5, GP-50, GP-150).
 
 Every byte offset, sentinel, record magic, and the file CRC live here and only
 here. app/patchlib.py (inventory + edits), patch/device_write.py (write
@@ -6,20 +6,23 @@ payload), patch/scan_bank.py + patch/reconstruct_prst.py (rebuild from device
 reads), and app/device_io.py (scan-cache naming) all consume this interface
 instead of slicing bytes themselves.
 
-Layout (decoded from the 0x41 read + 100/100 round-trip against presetExports;
-see re/DEVICE_READ.md):
+Layout (GP-5/GP-50; decoded from the 0x41 read + round-trip against device
+captures; see re/DEVICE_READ.md). NAME_OFF/BODY_OFF are GP-5/GP-50 only.
 
-  prst[0x00:0x14]  constant "GP-50" header                (HEADER)
+GP-5/GP-50 container (507/552 bytes):
+  prst[0x00:0x14]  constant header                       (HEADER, 20 bytes)
   prst[0x14]       file CRC — CRC-8/0x07 over prst[0x15:] (CRC_OFF)
   prst[0x15:0x19]  FF FF FF FF sentinel                   (SENTINEL)
   prst[0x19:0x29]  16-byte patch name, latin1, null-pad   (NAME_OFF..BODY_OFF)
-  prst[0x29:]      511-byte body                          (BODY_OFF, BODY_LEN)
+  prst[0x29:]      body                                  (BODY_OFF)
 
 Body records (offsets found by magic, not fixed position):
   REC_MODELS  [03 30 28 00] + 10 x 4-byte model records [fxlow b0][b1][b2][cat]
   REC_BYPASS  [01 30 04 00] + u32 bitmask, bit k = block k active
   REC_PARAMS  [04 30 40 01] + 80 x float32 (10 blocks x 8 param slots)
   FS_TRAILER  [03 00 0A 00] + [FS1 u32][FS2 u32][2 bytes] footswitch masks
+
+GP-150 is handled by patch/prst150_format.py (Task 4).
 
 stdlib-only on purpose: imported by the web app (.venv-app) and by the MIDI
 scripts (.venv-midi) alike.
@@ -72,19 +75,24 @@ DEVTAG_GP5 = bytes.fromhex("0a454d51")  # GP-5 device signature
 
 
 class DeviceProfile(NamedTuple):
-    key: str  # stable id: "gp50" | "gp5"
-    name: str  # display / factory-default patch name: "GP-50" | "GP-5"
-    header: bytes  # 20-byte fixed header ([0x00:0x14])
+    key: str  # stable id: "gp50" | "gp5" | "gp150"
+    name: str  # display / factory-default patch name
+    header: bytes  # fixed header prefix matched by detect() (20 bytes GP-5/50, 4 bytes GP-150)
     prst_len: int  # full .prst byte length
-    devtag: bytes  # 4-byte tag inside the 0xFF block
+    devtag: bytes  # 4-byte tag inside the 0xFF block (GP-5/50 only; b"" for GP-150)
     ring_file: str  # model catalog filename under patch/
     midi_port: str  # rtmidi port-name match for the live device
-    usb_pid: int  # USB idProduct (vendor is 0x84EF on both)
+    usb_pid: int  # USB idProduct (vendor is 0x84EF on all three)
+    slots: int = 100  # preset slots on the device
+    transport: str = "legacy"  # "legacy" (GP-5/50 nibble protocol) | "ht" (GP-150/180)
+    n_blocks: int = 10  # effect blocks in the signal chain
 
     @property
     def body_len(self) -> int:
         return self.prst_len - BODY_OFF
 
+
+HEADER_GP150 = bytes.fromhex("11306404")  # TLV magic: tag 0x11/0x30, length 1124
 
 GP50 = DeviceProfile(
     "gp50", "GP-50", HEADER_GP50, 552, DEVTAG_GP50, "fxid_ring.json", "GP-50", 0x018A
@@ -92,7 +100,11 @@ GP50 = DeviceProfile(
 GP5 = DeviceProfile(
     "gp5", "GP-5", HEADER_GP5, 507, DEVTAG_GP5, "fxid_ring_gp5.json", "GP-5", 0x0184
 )
-DEVICES = {p.key: p for p in (GP50, GP5)}
+GP150 = DeviceProfile(
+    "gp150", "GP-150", HEADER_GP150, 1128, b"", "fxid_ring_gp150.json", "GP-150", 0x0186,
+    slots=200, transport="ht", n_blocks=12,
+)
+DEVICES = {p.key: p for p in (GP50, GP5, GP150)}
 
 
 def profile_for(key: str) -> DeviceProfile:

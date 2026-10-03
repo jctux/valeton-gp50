@@ -32,7 +32,7 @@ from patch.prst_format import (  # noqa: E402
 # captures. Until a GP-5 patch-import is captured, a GP-5 write reuses the GP-50
 # constants on faith; send_stream() refuses it unless explicitly allowed. See
 # re/DEVICE_WRITE.md.
-WRITE_VERIFIED = {"gp50": True, "gp5": False}
+WRITE_VERIFIED = {"gp50": True, "gp5": False, "gp150": False}
 
 
 def build_packet(cmd: int, index: int, payload: bytes) -> list:

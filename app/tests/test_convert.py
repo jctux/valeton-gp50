@@ -190,4 +190,4 @@ def test_send_gate_refuses_unverified_gp5():
 
 
 def test_write_verified_map():
-    assert dw.WRITE_VERIFIED == {"gp50": True, "gp5": False}
+    assert dw.WRITE_VERIFIED == {"gp50": True, "gp5": False, "gp150": False}

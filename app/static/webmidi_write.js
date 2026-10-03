@@ -24,7 +24,7 @@
   const PATCH_HDR = [0x11, 0x4f]; // constant marker before the slot byte
   const NAME_OFF = 0x19;
   // Which devices' WRITE protocol is capture-verified (see device_write.py).
-  const WRITE_VERIFIED = { gp50: true, gp5: false };
+  const WRITE_VERIFIED = { gp50: true, gp5: false, gp150: false };
   const ACK_WAIT_MS = 150; // wait for the device ACK after each block (shallow queue)
 
   const crc8 = (bytes) => PRST.crc8(bytes);

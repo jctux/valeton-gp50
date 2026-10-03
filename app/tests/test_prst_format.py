@@ -82,3 +82,27 @@ def test_check_length_rejects_short_bodies():
         raise AssertionError("expected ValueError")
     except ValueError:
         pass
+
+
+EVIDENCE = sorted(glob.glob(os.path.join(PROJECT_ROOT, "re", "gp150", "evidence", "*.prst")))
+
+
+def test_gp150_profile_fields():
+    p = fmt.GP150
+    assert (p.key, p.name, p.prst_len, p.slots, p.transport, p.n_blocks) == (
+        "gp150", "GP-150", 1128, 200, "ht", 12)
+    assert p.usb_pid == 0x0186 and p.midi_port == "GP-150"
+    assert fmt.GP50.slots == 100 and fmt.GP50.transport == "legacy" and fmt.GP50.n_blocks == 10
+    assert fmt.GP5.slots == 100 and fmt.GP5.transport == "legacy"
+
+
+def test_detect_gp150_by_magic_then_length():
+    assert len(EVIDENCE) >= 3
+    for path in EVIDENCE:
+        b = open(path, "rb").read()
+        assert len(b) == 1128
+        assert fmt.detect(b).key == "gp150"
+    # length-only fallback (magic damaged) still lands on gp150 — nothing else is 1128
+    assert fmt.detect(b"\x00" * 1128).key == "gp150"
+    # a 507-byte file is still a GP-5
+    assert fmt.detect(open(os.path.join(PROJECT_ROOT, "app", "tests", "fixtures", "gp5", "65-Puppy.prst"), "rb").read()).key == "gp5"

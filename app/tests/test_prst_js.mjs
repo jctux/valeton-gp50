@@ -127,6 +127,18 @@ for (const rec of corpus) {
   check("blankPrst", "freshCopy", blank[0] === 0x47, "mutating one copy changed another");
 }
 
+// --- GP-150 profile + detect (Task 1) --------------------------------------
+{
+  const ev = resolve(repoRoot, "re/gp150/evidence/100-active.prst");
+  const u = new Uint8Array(readFileSync(ev));
+  check("gp150", "profile", PRST.GP150 && PRST.GP150.prstLen === 1128 && PRST.GP150.slots === 200
+    && PRST.GP150.transport === "ht" && PRST.GP150.nBlocks === 12 && PRST.DEVICES.gp150 === PRST.GP150);
+  check("gp150", "legacy profile defaults", PRST.GP50.slots === 100 && PRST.GP50.transport === "legacy" && PRST.GP50.nBlocks === 10);
+  let d = null; try { d = PRST.detect(u).key; } catch (e) { d = e.message; }
+  check("gp150", "detect by magic", d === "gp150", String(d));
+  check("gp150", "detect by length", PRST.detect(new Uint8Array(1128)).key === "gp150");
+}
+
 console.log(`\ncorpus: ${corpus.length} presets`);
 console.log(`checks: ${pass + fail}   pass: ${pass}   fail: ${fail}`);
 if (fail) {

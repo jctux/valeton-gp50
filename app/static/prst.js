@@ -24,12 +24,14 @@
   const hx = (s) => Uint8Array.from(s.match(/../g).map((h) => parseInt(h, 16)));
   const HEADER_GP50 = hx("47502d3530000000000000000000000000000100");
   const HEADER_GP5 = hx("47502d3500000000000000000000000000000100");
+  const HEADER_GP150 = hx("11306404");
   const DEVTAG_GP50 = hx("47503530");
   const DEVTAG_GP5 = hx("0a454d51");
 
-  const GP50 = { key: "gp50", name: "GP-50", header: HEADER_GP50, prstLen: 552, devtag: DEVTAG_GP50, ringFile: "fxid_ring.json", usbPid: 0x018a };
-  const GP5 = { key: "gp5", name: "GP-5", header: HEADER_GP5, prstLen: 507, devtag: DEVTAG_GP5, ringFile: "fxid_ring_gp5.json", usbPid: 0x0184 };
-  const DEVICES = { gp50: GP50, gp5: GP5 };
+  const GP50 = { key: "gp50", name: "GP-50", header: HEADER_GP50, prstLen: 552, devtag: DEVTAG_GP50, ringFile: "fxid_ring.json", usbPid: 0x018a, slots: 100, transport: "legacy", nBlocks: 10 };
+  const GP5 = { key: "gp5", name: "GP-5", header: HEADER_GP5, prstLen: 507, devtag: DEVTAG_GP5, ringFile: "fxid_ring_gp5.json", usbPid: 0x0184, slots: 100, transport: "legacy", nBlocks: 10 };
+  const GP150 = { key: "gp150", name: "GP-150", header: HEADER_GP150, prstLen: 1128, devtag: new Uint8Array(0), ringFile: "fxid_ring_gp150.json", usbPid: 0x0186, slots: 200, transport: "ht", nBlocks: 12 };
+  const DEVICES = { gp50: GP50, gp5: GP5, gp150: GP150 };
   const bodyLen = (p) => p.prstLen - BODY_OFF;
   const profileFor = (key) => { const p = DEVICES[key]; if (!p) throw new Error(`unknown device ${key}`); return p; };
 
@@ -350,7 +352,7 @@
 
   const API = {
     NAME_OFF, BODY_OFF, NAME_LEN, CRC_OFF, SETTINGS_OFF, N_BLOCKS, N_PARAM_SLOTS,
-    GP50, GP5, DEVICES, profileFor, bodyLen,
+    GP50, GP5, GP150, DEVICES, profileFor, bodyLen,
     crc8, refixCrc, detect, readName, writeName, rebuild,
     modelsOffset, modelRecords, modelRecOffset, bypassOffset, orderOffset, paramsOffset, bypassMask, paramFloats, fsOffset, findTLV,
     readOrder, writeOrder, isPermutation,
