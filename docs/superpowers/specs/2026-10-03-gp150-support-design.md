@@ -42,7 +42,7 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
   Device: ACK, then **family 0x70 stream**.
 - **Chunk stream** (families 0x70, 0x2c, 0x24): wire
   `F0 7F <ocrc> <fam> <08> <off_lo7> <off_hi7> <transfer_id> <chunk_idx> <nibbles> F7`,
-  248 bytes per full chunk = 118 decoded bytes; offset = `(off_lo7 | off_hi7<<7)` =
+  248 bytes per full chunk = 119 decoded bytes; offset = `(off_lo7 | off_hi7<<7)` =
   119 × (number of preceding chunks); `chunk_idx` is 1-based device→host and 0-based
   host→device; final chunk shorter. Concatenated decoded bytes =
   `[01][icrc][len u16 LE] + payload`. For a preset read, payload (1132) =
