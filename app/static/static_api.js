@@ -197,7 +197,12 @@
     if (path === "/api/device/status") {
       await ensureConnected();
       const connected = Bridge.connected();
-      return J({ connected, device: connected ? Bridge.device() : deviceObj(), port: connected ? Bridge.device().name : null });
+      const out = { connected, device: connected ? Bridge.device() : deviceObj(), port: connected ? Bridge.device().name : null };
+      // GP-150 link health (spec §5: surface corrupt frames after 3); absent otherwise,
+      // so the GP-5/GP-50 status JSON is unchanged.
+      const bad = connected && Bridge.stats ? (Bridge.stats().corruptFrames || 0) : 0;
+      if (bad >= 3) out.corrupt_frames = bad;
+      return J(out);
     }
 
     if (path === "/api/device/select") {

@@ -97,6 +97,7 @@
   let namesCache = null;
   let chain = Promise.resolve(); // serializes all device requests (one at a time)
   let ht = null; // HtTransport session when profile.transport === "ht" (it owns its own queue)
+  let connecting = null; // the in-flight connect(): concurrent callers share it
   const isHt = () => !!(profile && profile.transport === "ht");
 
   function assertReady() {
@@ -147,7 +148,14 @@
     });
   }
 
-  async function connect() {
+  // Re-entrant: a second connect() while one is in flight gets the same promise —
+  // two GP-150 sessions on one port would steal each other's input handler.
+  function connect() {
+    if (!connecting) connecting = doConnect().finally(() => { connecting = null; });
+    return connecting;
+  }
+
+  async function doConnect() {
     if (!navigator.requestMIDIAccess) throw new Error("this browser has no WebMIDI (use Chrome or Edge)");
     if (ht) { ht.close(); ht = null; } // a reconnect must not leave the old session's input handler behind
     access = await navigator.requestMIDIAccess({ sysex: true });
@@ -174,6 +182,8 @@
 
   const isConnected = () => !!(input && output);
   const device = () => (profile ? { key: profile.key, name: profile.name } : null);
+  // Link health. corruptFrames: GP-150 frames dropped for a bad CRC (always 0 on GP-5/GP-50).
+  const stats = () => ({ corruptFrames: ht ? ht.stats().badFrames : 0 });
 
   function readNames() {
     assertReady();
@@ -294,7 +304,7 @@
 
   root.WebMidiDevice = {
     connect, disconnect,
-    isConnected, device, readNames, readBankBlob, selectSlot, readActivePrst, readSlotPrst, readSlotOrNull, scanSlots, _sendStream,
+    isConnected, device, stats, readNames, readBankBlob, selectSlot, readActivePrst, readSlotPrst, readSlotOrNull, scanSlots, _sendStream,
     _ht: () => ht, // the GP-150 HtTransport session (null otherwise) — tests / webmidi_write
     // exposed for tests / the probe
     _codec: { crc8, buildRequest, toWire, nibDecode, reassemble, splitNames, findPort },

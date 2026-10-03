@@ -16,6 +16,8 @@
     webmidiAvailable: () => !!(navigator.requestMIDIAccess && root.WebMidiDevice && root.WebMidiWrite && root.PRST),
     connected: () => !!(dev() && dev().isConnected()),
     device: () => (dev() ? dev().device() : null),
+    // {corruptFrames} — GP-150 frames dropped for a bad CRC (spec §5: surface after 3).
+    stats: () => (dev() && dev().stats ? dev().stats() : { corruptFrames: 0 }),
 
     // Connect over WebMIDI (must be called from a user gesture the first time —
     // the SysEx permission prompt needs it). Returns {key,name,port}.

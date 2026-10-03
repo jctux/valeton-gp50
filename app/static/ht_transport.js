@@ -77,7 +77,8 @@
 
     // One exchange: send `wire`, collect frames until done. Resolves (never rejects)
     // with {ack, frames, chunks} plus one of {payload, transferId} | {silent} |
-    // {error} | {timeout}. `frames` = every non-ACK frame, chunks included.
+    // {error} | {timeout} | {error, aborted} (session closed). `frames` = every
+    // non-ACK frame, chunks included.
     //  - non-stream: done on the first non-ACK, non-chunk frame that `until(frame)`
     //    accepts (default: any), or idleMs after the ACK.
     //  - stream: done on the final (short) chunk (assembled), or `silent` when no
@@ -105,8 +106,11 @@
           frames.push(f);
           if (!HT.isChunk(f)) { if (!stream && (!until || until(f))) finish(); return; } // reply / status message
           if (!stream) return;
-          // offset 0 opens a stream: drop any partial leftovers (e.g. a resend).
-          if (((f.tx4[1] & 0x7f) | ((f.tx4[2] & 0x7f) << 7)) === 0) chunks.length = 0;
+          // offset 0 opens a stream: drop any partial leftovers (e.g. a resend), and
+          // ignore the tail of an older stream that started before this exchange.
+          const offset = (f.tx4[1] & 0x7f) | ((f.tx4[2] & 0x7f) << 7);
+          if (offset === 0) chunks.length = 0;
+          else if (!chunks.length) return;
           chunks.push(f);
           lastChunkAt = Date.now();
           if (w.length < HT.FULL_WIRE_LEN) { // final chunk (already ACKed in onMessage)
@@ -115,7 +119,7 @@
           }
         };
         current = handler;
-        abortCurrent = () => finish({ error: new Error("session closed") });
+        abortCurrent = () => finish({ error: new Error("session closed"), aborted: true });
         tick = setInterval(() => {
           const now = Date.now();
           if (stream) {
@@ -143,45 +147,78 @@
       if (!(Number.isInteger(slot) && slot >= 0 && slot < HT.SLOT_ACTIVE)) throw new Error(`slot out of range: ${slot}`);
     };
 
-    // Read one preset without selecting it (flag 1). null = empty slot (the pedal
-    // stays silent; spec §2). A garbled / incomplete stream is retried once; a
-    // stream whose preset index is not `slot` (a stale resend) is retried once and
-    // then kept with a warning (index == slot on every read so far).
+    const sessionClosed = () => new Error("session closed");
+
+    // Read one preset without selecting it (flag 1). Returns the 1128-byte .prst,
+    // or null for an empty slot. The pedal ACKs every read request, so:
+    //  - ACK, then emptyTimeoutMs of silence            -> null (empty slot, spec §2)
+    //  - no ACK and no stream                           -> re-send once (new tx); if
+    //    that is silent and un-ACKed too, a hello probe decides: answered -> null
+    //    (covers a pedal that does not ACK empty-slot reads), else NOT_RESPONDING
+    //  - a chunk shows up during the probe              -> a late stream: discard it
+    //    and read again (at most 2 more reads), never null on that path
+    //  - garbled / stalled / timed-out stream           -> one retry
+    //  - preset index != slot (a stale resend)          -> one retry, then kept + warning
     function readPreset(slot) {
       return job(async () => {
         checkSlot(slot, true);
-        let lastErr = null;
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          if (attempt > 1) await sleep(o.settleMs); // let any tail of the bad stream pass
-          if (closed) throw new Error("session closed");
+        const read = async (attempt) => {
+          if (attempt > 1) await sleep(o.settleMs); // let any tail of an earlier stream pass
+          if (closed) throw sessionClosed();
           const r = await exchange(HT.presetRequest(nextTx(), slot, false), { stream: true });
+          if (r.aborted) throw r.error;
+          return r;
+        };
+        let lastErr = null, mismatched = null, unacked = 0, attempt = 0, budget = 2, lateStream = false;
+        while (budget-- > 0) {
+          const r = await read(++attempt);
           if (r.payload) {
             let prst;
             try { prst = HT.presetFromPayload(r.payload); } catch (err) { lastErr = err; continue; }
             if (slot === HT.SLOT_ACTIVE || prst[4] === slot) return prst;
-            if (attempt === 2) { log("warn", `slot ${slot} answered with preset index ${prst[4]} twice; keeping it`); return prst; }
+            if (mismatched) { log("warn", `slot ${slot} answered with preset index ${prst[4]} twice; keeping it`); return prst; }
+            mismatched = prst; lastErr = new Error(`slot ${slot} answered with preset index ${prst[4]}`);
             continue;
           }
-          if (r.silent) {
-            if (r.ack) return null; // ACKed, then nothing: an empty slot
-            if (await alive()) return null; // not even an ACK, but the pedal is there: still empty
+          if (r.silent && r.ack) {
+            if (!lateStream) return null; // ACKed, then nothing: an empty slot
+            lastErr = new Error(`slot ${slot}: a late preset stream, then silence — read it again`);
+            continue;
+          }
+          if (r.silent) { // neither an ACK nor a stream: a lost / late request
+            unacked++;
+            if (budget > 0 || lateStream || unacked < 2) { lastErr = new Error(NOT_RESPONDING); continue; }
+            // both reads un-ACKed and silent: is the pedal there at all?
+            if (closed) throw sessionClosed();
+            const p = await exchange(HT.hello(), { until: isHandshakeReply });
+            if (p.aborted) throw p.error;
+            if (p.frames.some((f) => HT.isChunk(f))) { // the stream was just late
+              lateStream = true; budget = 2; lastErr = new Error(NOT_RESPONDING);
+              continue;
+            }
+            if (p.frames.some(isHandshakeReply)) return null; // pedal is there; the slot is silent
             throw new Error(NOT_RESPONDING);
           }
           lastErr = r.error || new Error(r.timeout ? "preset read timed out" : "preset stream incomplete");
         }
-        throw lastErr;
+        throw lastErr || new Error(NOT_RESPONDING);
       });
     }
 
     // Switch the pedal to `slot` (flag 0). The pedal ACKs, sends a 0x18 status and
-    // the preset stream; both are ACKed and drained here.
+    // the preset stream; both are ACKed and drained here. No ACK (and no stream)
+    // -> one re-send, then NOT_RESPONDING. A hello answer alone is not success.
     function selectSlot(slot) {
       return job(async () => {
         checkSlot(slot, false);
-        const r = await exchange(HT.presetRequest(nextTx(), slot, true), { stream: true });
-        if (r.ack || r.payload) return;
-        if (r.error) throw r.error;
-        if (!(await alive())) throw new Error(NOT_RESPONDING);
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          if (attempt > 1) await sleep(o.settleMs);
+          if (closed) throw sessionClosed();
+          const r = await exchange(HT.presetRequest(nextTx(), slot, true), { stream: true });
+          if (r.aborted) throw r.error;
+          if (r.ack || r.chunks.length) return; // the pedal took it
+        }
+        throw new Error(NOT_RESPONDING);
       });
     }
 

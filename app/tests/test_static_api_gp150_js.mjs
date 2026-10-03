@@ -19,8 +19,8 @@ const data = { "presets.json": read("app/static/data/presets.json"), "fxid_ring.
 globalThis.fetch = async (url) => { const f = String(url).split("/").pop(); return { ok: f in data, json: async () => JSON.parse(data[f]) }; };
 globalThis.PRST = require(resolve(root, "app/static/prst.js")); globalThis.PRST150 = require(resolve(root, "app/static/prst150.js"));
 globalThis.PatchLib = require(resolve(root, "app/static/patchlib.js"));
-let connectedKey = null; const reads = []; let readImpl = null;
-globalThis.DeviceBridge = { webmidiAvailable: () => true, connected: () => !!connectedKey, device: () => ({ key: connectedKey, name: connectedKey === "gp150" ? "GP-150" : "GP-50" }), connect: async () => {}, readNames: async () => [], readSlotOrNull: async (slot) => { reads.push(slot); if (readImpl) return readImpl(slot); return slot === 199 ? null : b; }, readSlotPrst: async () => b, selectSlot: async () => {} };
+let connectedKey = null; const reads = []; let readImpl = null; let corrupt = 0;
+globalThis.DeviceBridge = { webmidiAvailable: () => true, connected: () => !!connectedKey, device: () => ({ key: connectedKey, name: connectedKey === "gp150" ? "GP-150" : "GP-50" }), connect: async () => {}, readNames: async () => [], readSlotOrNull: async (slot) => { reads.push(slot); if (readImpl) return readImpl(slot); return slot === 199 ? null : b; }, readSlotPrst: async () => b, selectSlot: async () => {}, stats: () => ({ corruptFrames: corrupt }) };
 const apiPath = resolve(root, "app/static/static_api.js");
 require(apiPath);
 let api = globalThis.__staticApi;
@@ -104,6 +104,19 @@ connectedKey = "gp50"; await get("/api/device/status");
 const sc2 = await waitScan();
 check("device change aborts the scan", !sc2.running && /changed/.test(sc2.error || "") && sc2.done < 200, JSON.stringify(sc2));
 check("no GP-150 bytes in the gp50 store after the abort", [...lengths()].join() === "552");
+
+// corrupt frames surface in /api/device/status from the 3rd on (absent before)
+{
+  connectedKey = "gp150";
+  corrupt = 2;
+  const s2 = await get("/api/device/status");
+  check("corrupt_frames absent below 3", !("corrupt_frames" in s2));
+  corrupt = 3;
+  check("corrupt_frames surfaced at 3", (await get("/api/device/status")).corrupt_frames === 3);
+  corrupt = 0;
+  connectedKey = "gp50";
+  check("gp50 status JSON unchanged", JSON.stringify(Object.keys(await get("/api/device/status"))) === JSON.stringify(["connected", "device", "port"]));
+}
 
 // a pedal that stops answering: the scan gives up after 3 straight failures
 connectedKey = "gp150"; await get("/api/device/status");

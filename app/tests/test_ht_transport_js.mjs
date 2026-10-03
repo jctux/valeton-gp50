@@ -30,26 +30,32 @@ const FAST = { settleMs: 5, emptyTimeoutMs: 60, timeoutMs: 500, idleMs: 60 };
 //   ackSilent  — false: no ACK either for slot 199 ("produced no reply at all")
 //   dead       — never answers anything (not even hello)
 //   dropChunk  — index of a chunk to leave out (gap -> stream error)
-function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-150" } = {}) {
-  const sent = []; const input = { name, onmidimessage: null }; let ackedFinal = 0;
+//   onRead({n, slot, ack, stream}) — script the reply to the n-th 0x0f request
+//   onHello({reply, stream})       — script the reply to a hello
+function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-150", onRead = null, onHello = null } = {}) {
+  const sent = []; const input = { name, onmidimessage: null }; let ackedFinal = 0, reads = 0;
   const deliver = (u8) => input.onmidimessage && input.onmidimessage({ data: u8 });
   const emit = (u8, ms = 1) => setTimeout(() => deliver(u8), ms);
+  const stream = (ms0 = 5) => exportChunks.forEach((c, i) => { if (i !== dropChunk) emit(c, ms0 + i * 2); });
   const output = { name, send(bytes) {
     const w = Uint8Array.from(bytes); sent.push(w); const f = HT.parseFrame(w);
     if (dead) return;
-    if (f.family === 0x00 && f.tx4[1] === 0x01) return emit(MSG.hello_reply);
+    if (f.family === 0x00 && f.tx4[1] === 0x01) return onHello ? onHello({ reply: (ms = 1) => emit(MSG.hello_reply, ms), stream }) : emit(MSG.hello_reply);
     if (f.family === 0x00) { if (f.tx4[3] === 0x0c) ackedFinal++; return; }
     if (f.family === 0x0f) {
       const payload = reqPayload(w);
       const slot = payload[8] | (payload[9] << 8);
+      reads++;
+      if (onRead) return onRead({ n: reads, slot, ack: () => emit(HT.ack(f.tx4[3])), stream });
       if (slot === 199 && !ackSilent) return; // no ACK, no stream
       emit(HT.ack(f.tx4[3]));
       if (slot === 199) return; // empty slot: silence after the ACK
-      exportChunks.forEach((c, i) => { if (i !== dropChunk) emit(c, 5 + i * 2); });
+      stream();
     }
   } };
-  return { input, output, sent, deliver, finalAcks: () => ackedFinal };
+  return { input, output, sent, deliver, finalAcks: () => ackedFinal, reads: () => reads };
 }
+const isHelloReq = (w) => w[3] === 0x00 && w[5] === 0x01;
 
 // --- brief scenario --------------------------------------------------------------
 const pedal = fakePedal();
@@ -132,7 +138,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   const s5 = T.create(p.input, p.output, FAST);
   const t1 = Date.now();
   check("no-ACK silent slot -> null when pedal answers hello", await s5.readPreset(199) === null);
-  check("no-ACK silent slot probes with hello", p.sent.some((w) => w[3] === 0x00 && w[5] === 0x01));
+  check("no-ACK silent slot re-sent once, then one hello probe", p.reads() === 2 && p.sent.filter(isHelloReq).length === 1 && isHelloReq(p.sent[p.sent.length - 1]));
   check("no-ACK silent slot bounded", Date.now() - t1 < 1500);
   s5.close();
 }
@@ -141,7 +147,69 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   const s6 = T.create(p.input, p.output, FAST);
   const err = await s6.readPreset(5).then(() => null, (e) => e);
   check("dead pedal -> rejects 'not responding'", err && /not responding/.test(err.message), err && err.message);
+  check("dead pedal: 2 reads + 1 hello", p.sent.filter(isPresetReq).length === 2 && p.sent.filter(isHelloReq).length === 1);
   s6.close();
+}
+
+// --- (a) the first read request is lost: re-sent, preset returned ------------------
+{
+  const p = fakePedal({ onRead: ({ n, ack, stream }) => { if (n === 1) return; ack(); stream(); } });
+  const sa = T.create(p.input, p.output, FAST);
+  const r = await sa.readPreset(0);
+  check("lost first request -> preset", r && r.length === 1128);
+  check("lost first request -> exactly 2 reads, no hello", p.reads() === 2 && !p.sent.some(isHelloReq));
+  sa.close();
+}
+
+// --- (b) no ACK, stream starts just after the silence window -> preset, not null ---
+{
+  const SLOW = { settleMs: 5, emptyTimeoutMs: 100, timeoutMs: 500, idleMs: 60, tickMs: 5 };
+  const p = fakePedal({ onRead: ({ n, stream }) => { if (n === 1) stream(150); } });
+  const sb = T.create(p.input, p.output, SLOW);
+  const r = await sb.readPreset(0);
+  check("late un-ACKed stream -> preset, not null", r && r.length === 1128, String(r));
+  sb.close();
+}
+
+// --- a late stream that lands during the hello probe: read again, never null --------
+{
+  const p = fakePedal({ onRead: ({ n, ack, stream }) => { if (n >= 3) { ack(); stream(); } }, onHello: ({ reply, stream }) => { stream(1); reply(40); } });
+  const sp = T.create(p.input, p.output, FAST);
+  const r = await sp.readPreset(0);
+  check("stream during the probe -> read again -> preset", r && r.length === 1128 && p.reads() === 3, `${r && r.length} reads=${p.reads()}`);
+  sp.close();
+}
+{
+  const p = fakePedal({ onRead: ({ n, ack }) => { if (n >= 3) ack(); }, onHello: ({ reply, stream }) => { stream(1); reply(40); } });
+  const sp = T.create(p.input, p.output, FAST);
+  const err = await sp.readPreset(0).then((v) => ({ value: v }), (e) => e);
+  check("stream during the probe, then ACK + silence -> rejects (never null)", err instanceof Error, JSON.stringify(err));
+  check("at most 2 reads after the probe", p.reads() === 4 && p.sent.filter(isHelloReq).length === 1, `reads=${p.reads()}`);
+  sp.close();
+}
+
+// --- (c) selectSlot with no ACK on both attempts -> NOT_RESPONDING ------------------
+{
+  const p = fakePedal({ onRead: () => {} }); // hello still answered
+  const sc = T.create(p.input, p.output, FAST);
+  const err = await sc.selectSlot(4).then(() => null, (e) => e);
+  check("select without ACK -> rejects not responding", err && /not responding/.test(err.message), err && err.message);
+  check("select re-sent once, no hello", p.reads() === 2 && !p.sent.some(isHelloReq));
+  sc.close();
+}
+
+// --- close() while a read is in flight -> "session closed", nothing more sent ------
+{
+  const p = fakePedal({ dead: true });
+  const sx = T.create(p.input, p.output, FAST);
+  const pending = sx.readPreset(0).then(() => null, (e) => e);
+  await sleep(20);
+  sx.close();
+  const n = p.sent.length;
+  const err = await pending;
+  await sleep(150);
+  check("close mid-read -> rejects 'session closed'", err && /session closed/.test(err.message), err && err.message);
+  check("close mid-read -> no further bytes", p.sent.length === n, `${n} -> ${p.sent.length}`);
 }
 
 // --- stream gap: one retry, then a clear error -------------------------------------
@@ -187,10 +255,14 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { requestMIDIAccess: async () => ({ inputs: portMap(p50.input, p150.input), outputs: portMap(p50.output, p150.output) }) } });
   require(resolve(root, "app/static/webmidi_device.js"));
   const D = globalThis.WebMidiDevice;
-  const info = await D.connect();
+  const [info, info2] = await Promise.all([D.connect(), D.connect()]);
+  check("concurrent connect() share one attempt", info2 && info2.key === "gp150" && D.isConnected());
   check("GP-150 port wins over GP-50", info.key === "gp150" && info.port === "GP-150", JSON.stringify(info));
   check("connect said hello", p150.sent.length === 1 && hex(p150.sent[0]) === hex(MSG.hello) && p50.sent.length === 0);
   check("ht session exposed", !!(D._ht && D._ht()));
+  const bad = Uint8Array.from(MSG.ident_reply); bad[2] ^= 0x01;
+  for (let i = 0; i < 3; i++) p150.deliver(bad);
+  check("stats() counts corrupt frames", D.stats().corruptFrames === 3, JSON.stringify(D.stats()));
   check("readNames -> [] on ht", (await D.readNames()).length === 0);
   check("readBankBlob refuses on ht", await D.readBankBlob(0x24).then(() => false, (e) => /GP-150/.test(e.message)));
   check("readSlotOrNull silent -> null", await D.readSlotOrNull(199) === null);
