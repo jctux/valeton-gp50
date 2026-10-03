@@ -8,6 +8,11 @@
  * (WebMIDI) and the block library in localStorage. Everything else falls through
  * to the real fetch. The Explorer's own code is untouched — it still "calls the
  * backend"; the backend is just in the page now.
+ *
+ * The store belongs to ONE device profile (gp50 | gp5 | gp150): its codec
+ * (PRST.codecFor), ring, slot count and bytes. Whenever a pedal is connected the
+ * store is switched to that pedal's profile first (switchProfile), so one device's
+ * bytes are never shown or written as another's.
  */
 (function (root) {
   const STATIC = (() => {
@@ -30,7 +35,7 @@
     try { const s = document.currentScript && document.currentScript.src; if (s) return new URL("data/", s).href; } catch { /* fall through */ }
     return "/static/data/";
   })();
-  const dataUrl = (f) => new URL(f, DATA_BASE).href;
+  const dataUrl = (f) => { try { return new URL(f, DATA_BASE).href; } catch { return DATA_BASE + f; } }; // relative base (no currentScript)
 
   // once the user has interacted, status checks may connect WebMIDI (needs a
   // gesture); before that, don't auto-prompt on page load.
@@ -61,53 +66,103 @@
   }
 
   // --- data store (bundled snapshot) -----------------------------------------
-  let store = null; // { profile, lib, bytes: Map(slot->Uint8Array), names: Map, snapshotName: Map }
+  // { profile, codec, ring, bankMap, lib, bytes: Map(slot->Uint8Array), names: Map, cachedCount, snap }
+  let store = null;
   let invCache = null;
   let loading = null;
+  let switching = null; // { key, promise } while a profile switch is building its store
+
+  const detectKey = (u8) => { try { return PRST.detect(u8).key; } catch { return null; } };
+
+  // A store for one device profile: the bundled snapshot only if it is that
+  // device's, overlaid with the localStorage scan cache only if it is that
+  // device's. Anything else starts empty (a scan fills it).
+  async function buildStore(profile, snap) {
+    const codec = PRST.codecFor(profile);
+    const ringRes = await realFetch(dataUrl(profile.ringFile));
+    if (!ringRes.ok) throw new Error(`could not load the ${profile.name} model catalog (${profile.ringFile})`);
+    const ring = await ringRes.json();
+    let bankMap = await realFetch(dataUrl("bank_map.json")).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
+    // A prior "Sync SnapTones and IRs from device" only ever lived in memory —
+    // same reload-loses-it bug as the preset scan. Restore it here so real IR/
+    // SnapTone names survive a refresh instead of falling back to "User IR N".
+    const savedBankMap = lsGet(LS_BANKMAP, null);
+    if (savedBankMap && savedBankMap.profileKey === profile.key && savedBankMap.bankMap) bankMap = savedBankMap.bankMap;
+    const bytes = new Map(), names = new Map();
+    if (snap && (snap.device || "gp50") === profile.key) {
+      for (const p of snap.presets) { bytes.set(p.slot, b64ToBytes(p.b64)); names.set(p.slot, p.name); }
+    }
+    // Overlay any real device reads we've cached locally, so a reload shows the
+    // user's actual presets instead of the blank bundle for every slot already
+    // scanned in a prior visit.
+    const cache = lsGet(LS_SCAN, null);
+    let cachedCount = 0;
+    if (cache && cache.slots) {
+      let mine = cache.profileKey === profile.key;
+      // Before profiles switched, every read was filed under the bundle's key
+      // ("gp50") — a GP-5's included. Adopt such a cache (and relabel it) only
+      // when every entry's bytes really are this device's.
+      const entries = Object.values(cache.slots);
+      if (!mine && entries.length && entries.every((e) => { try { return detectKey(b64ToBytes(e.b64)) === profile.key; } catch { return false; } })) {
+        mine = true; cache.profileKey = profile.key; lsSet(LS_SCAN, cache);
+      }
+      if (mine) {
+        for (const [slotStr, entry] of Object.entries(cache.slots)) {
+          try { bytes.set(Number(slotStr), b64ToBytes(entry.b64)); names.set(Number(slotStr), entry.name); cachedCount++; }
+          catch { /* corrupt cache entry — skip it, keep the bundle default */ }
+        }
+      }
+    }
+    return { profile, codec, ring, bankMap, lib: PatchLib.make(ring, bankMap, profile), bytes, names, cachedCount, snap };
+  }
 
   async function ensureLoaded() {
     if (store) return store;
     if (loading) return loading;
     loading = (async () => {
       const snap = await realFetch(dataUrl("presets.json")).then((r) => r.json());
-      const profile = PRST.profileFor(snap.device || "gp50");
-      const ring = await realFetch(dataUrl(profile.ringFile)).then((r) => r.json());
-      let bankMap = await realFetch(dataUrl("bank_map.json")).then((r) => r.ok ? r.json() : {}).catch(() => ({}));
-      // A prior "Sync SnapTones and IRs from device" only ever lived in memory —
-      // same reload-loses-it bug as the preset scan. Restore it here so real IR/
-      // SnapTone names survive a refresh instead of falling back to "User IR N".
-      const savedBankMap = lsGet(LS_BANKMAP, null);
-      if (savedBankMap && savedBankMap.profileKey === profile.key && savedBankMap.bankMap) bankMap = savedBankMap.bankMap;
-      const bytes = new Map(), names = new Map();
-      for (const p of snap.presets) { bytes.set(p.slot, b64ToBytes(p.b64)); names.set(p.slot, p.name); }
-      // Overlay any real device reads we've cached locally, so a reload shows the
-      // user's actual presets instead of the blank bundle for every slot already
-      // scanned in a prior visit.
-      const cache = lsGet(LS_SCAN, null);
-      let cachedCount = 0;
-      if (cache && cache.profileKey === profile.key && cache.slots) {
-        for (const [slotStr, entry] of Object.entries(cache.slots)) {
-          try { bytes.set(Number(slotStr), b64ToBytes(entry.b64)); names.set(Number(slotStr), entry.name); cachedCount++; }
-          catch { /* corrupt cache entry — skip it, keep the bundle default */ }
-        }
-      }
-      store = { profile, ring, bankMap, lib: PatchLib.make(ring, bankMap, profile), bytes, names, cachedCount };
+      // Boot into the profile of the last scan (a GP-150 owner reloading the page
+      // sees their GP-150 presets, not the GP-50 bundle); else the bundle's.
+      const cache = lsGet(LS_SCAN, null), bundleKey = snap.device || "gp50";
+      const key = cache && cache.profileKey && PRST.DEVICES[cache.profileKey] ? cache.profileKey : bundleKey;
+      try { store = await buildStore(PRST.profileFor(key), snap); }
+      catch (e) { if (key === bundleKey) throw e; store = await buildStore(PRST.profileFor(bundleKey), snap); }
       return store;
     })();
     return loading;
+  }
+
+  // Rebuild the store for another device profile (no-op when already on it).
+  async function switchProfile(key) {
+    await ensureLoaded();
+    if (store.profile.key === key) return store;
+    if (switching && switching.key === key) return switching.promise;
+    const promise = buildStore(PRST.profileFor(key), store.snap).then(
+      (s) => { store = s; invalidate(); switching = null; return s; },
+      (e) => { switching = null; throw e; });
+    switching = { key, promise };
+    return promise;
   }
 
   const presetList = () => [...store.bytes.keys()].sort((a, z) => a - z)
     .map((slot) => ({ slot, bytes: store.bytes.get(slot), name: store.names.get(slot) }));
   const inventory = () => (invCache ||= store.lib.inventory(presetList()));
   const invalidate = () => { invCache = null; };
-  const deviceObj = () => ({ key: store.profile.key, name: store.profile.name, usb_pid: store.profile.usbPid, prst_len: store.profile.prstLen });
+  const deviceObj = () => ({ key: store.profile.key, name: store.profile.name, usb_pid: store.profile.usbPid, prst_len: store.profile.prstLen, slots: store.profile.slots });
+  const slotOk = (slot) => Number.isInteger(slot) && slot >= 0 && slot < store.profile.slots;
 
   // --- device I/O helpers (WebMIDI) ------------------------------------------
+  // Connected => the store is switched to the connected pedal's profile before any
+  // handler touches bytes. A failed switch throws: better no answer than one
+  // device's presets filed under another.
   async function ensureConnected() {
-    if (Bridge.connected()) return true;
-    if (!Bridge.webmidiAvailable() || !userEngaged) return false;
-    try { await Bridge.connect(); return true; } catch { return false; }
+    if (!Bridge.connected()) {
+      if (!Bridge.webmidiAvailable() || !userEngaged) return false;
+      try { await Bridge.connect(); } catch { return false; }
+    }
+    const dev = Bridge.device();
+    if (dev && dev.key && dev.key !== store.profile.key) await switchProfile(dev.key);
+    return true;
   }
 
   // --- endpoint handlers ------------------------------------------------------
@@ -119,7 +174,7 @@
       return J({
         source: `bundled snapshot (${store.bytes.size} presets)`,
         device: deviceObj(), snaptones: inv.snaptones, irs: inv.irs, patches: inv.patches,
-        domains: { patch_slots: [0, 99], snaptone_slots: [0, 79], user_snaptone_slots: [50, 79], user_ir_base: 0x100000 },
+        domains: { patch_slots: [0, store.profile.slots - 1], snaptone_slots: [0, 79], user_snaptone_slots: [50, 79], user_ir_base: 0x100000 },
       });
     }
     if (path === "/api/device/facets") return J(store.lib.facets(inventory().patches));
@@ -205,12 +260,12 @@
   // patchlib.repoint_snaptone_body (NS_CAT = 0x0F).
   function repointSnaptone(prst, targetNsSlot, name) {
     if (!(targetNsSlot >= 0 && targetNsSlot <= 79)) throw new Error(`SnapTone slot out of range: ${targetNsSlot}`);
-    const b = Uint8Array.from(prst);
-    const off = PRST.modelRecOffset(b, 0x0f);
+    const b = Uint8Array.from(prst), C = store.codec;
+    const off = C.modelRecOffset(b, 0x0f);
     if (off < 0) throw new Error("patch has no N->S (SnapTone) block to repoint");
     b[off] = targetNsSlot;
-    if (name != null) PRST.writeName(b, name);
-    PRST.refixCrc(b);
+    if (name != null) C.writeName(b, name);
+    C.refixCrc(b);
     return b;
   }
 
@@ -227,13 +282,13 @@
       return new Response(prst, { status: 200, headers: { "Content-Type": "application/octet-stream", "Content-Disposition": `attachment; filename="${safe}.prst"` } });
     }
     if (!body.confirm) return J({ ok: false, error: "confirm required" });
-    if (!(body.target_slot >= 0 && body.target_slot <= 99)) return J({ ok: false, error: "target_slot 0..99 required" });
+    if (!slotOk(body.target_slot)) return J({ ok: false, error: `target_slot 0..${store.profile.slots - 1} required` });
     if (!(await ensureConnected())) return J({ ok: false, error: "no device connected" });
     try {
       const r = await Bridge.writeSlot(body.target_slot, prst);
-      store.bytes.set(body.target_slot, prst); store.names.set(body.target_slot, PRST.readName(prst)); invalidate();
+      store.bytes.set(body.target_slot, prst); store.names.set(body.target_slot, store.codec.readName(prst)); invalidate();
       persistSlot(body.target_slot);
-      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: PRST.readName(prst) });
+      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(prst) });
     } catch (e) { return J({ ok: false, error: e.message }); }
   }
 
@@ -247,13 +302,14 @@
     if (!base) return J({ ok: false, error: `unknown slot ${body.patch_slot}` });
     const hasEdits = ["params", "bypass", "settings", "footswitches", "models"].some((k) => body[k] && Object.keys(body[k]).length)
       || body.name != null || body.order != null;
-    const prst = hasEdits ? PRST.applyEdits(base, editsFrom(body)) : base;
     const target = body.target_slot;
+    if (!slotOk(target)) return J({ ok: false, error: `target_slot 0..${store.profile.slots - 1} required` });
+    const prst = hasEdits ? store.codec.applyEdits(base, editsFrom(body)) : base;
     try {
       const r = await Bridge.writeSlot(target, prst);
-      store.bytes.set(target, prst); store.names.set(target, PRST.readName(prst)); invalidate();
+      store.bytes.set(target, prst); store.names.set(target, store.codec.readName(prst)); invalidate();
       persistSlot(target);
-      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: PRST.readName(prst) });
+      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(prst) });
     } catch (e) { return J({ ok: false, error: e.message }); }
   }
 
@@ -276,7 +332,7 @@
   function handleEdit(body) {
     const base = store.bytes.get(body.patch_slot);
     if (!base) return J({ detail: `unknown slot ${body.patch_slot}` }, 400);
-    const prst = PRST.applyEdits(base, editsFrom(body));
+    const prst = store.codec.applyEdits(base, editsFrom(body));
     const stem = (store.names.get(body.patch_slot) || `slot${body.patch_slot}`).replace(/\s+/g, "_");
     return new Response(prst, { status: 200, headers: { "Content-Type": "application/octet-stream", "Content-Disposition": `attachment; filename="${stem}__edited.prst"` } });
   }
@@ -330,13 +386,48 @@
   }
 
   // --- device scan (rebuild the snapshot from the pedal over WebMIDI) ---------
-  let scanState = { running: false, done: 0, total: 0, current: "", errors: 0, written: 0, error: null };
+  // `empty` counts GP-150 slots that stayed silent (stored as a nameless blank).
+  let scanState = { running: false, done: 0, total: 0, current: "", errors: 0, written: 0, empty: 0, error: null };
+  const SCAN_MAX_STRAIGHT_ERRORS = 3; // GP-150: this many failed reads in a row = the pedal is gone
   async function startScan() {
     if (scanState.running) return J({ ok: true });
     if (!(await ensureConnected())) return J({ ok: false, error: "no device connected" });
-    scanState = { running: true, done: 0, total: 100, current: "", errors: 0, written: 0, error: null };
+    const st = store, C = st.codec;
+    scanState = { running: true, done: 0, total: st.profile.slots, current: "", errors: 0, written: 0, empty: 0, error: null };
+    // The pedal can be swapped mid-scan (status switches the store): stop, and
+    // never file this pedal's reads into the other device's store.
+    const guard = () => { if (store !== st) { const e = new Error("the connected pedal changed during the scan — scan again"); e.abort = true; throw e; } };
     (async () => {
       try {
+        if (st.profile.transport === "ht") {
+          // GP-150: no bulk name read — read every slot; silence = empty slot.
+          let straight = 0;
+          for (let slot = 0; slot < st.profile.slots; slot++) {
+            guard();
+            scanState.current = `#${slot}`;
+            let prst = null, failure = null;
+            try {
+              prst = await Bridge.readSlotOrNull(slot);
+              if (prst && !C.detect(prst)) throw new Error(`slot ${slot}: not a ${st.profile.name} preset`);
+            } catch (e) { failure = e; }
+            guard();
+            if (failure) {
+              scanState.errors++; scanState.done++;
+              if (++straight >= SCAN_MAX_STRAIGHT_ERRORS) throw failure;
+              continue;
+            }
+            straight = 0;
+            if (prst) { st.bytes.set(slot, prst); st.names.set(slot, C.readName(prst)); scanState.written++; }
+            else {
+              // a nameless factory blank: patchlib reads name "" as empty (layout.emptyName)
+              const blank = C.blankPrst(slot); C.writeName(blank, "");
+              st.bytes.set(slot, blank); st.names.set(slot, ""); scanState.empty++;
+            }
+            try { persistSlot(slot); } catch { /* cache is best-effort (quota) */ }
+            scanState.done++;
+          }
+          return;
+        }
         const names = await Bridge.readNames();
         // A MIDI request that gets no reply resolves as an empty blob rather than
         // throwing (see webmidi_device.js's exchange()) — that used to fall
@@ -349,21 +440,22 @@
         }
         scanState.total = names.length;
         for (const { slot, name } of names) {
+          guard();
           scanState.current = `#${slot} ${name}`;
           // An explicit scan always re-reads every slot from the pedal — no
           // skipping via the local cache. A skip-if-cached "resume" here risked
           // replaying stale/bad data instead of ever touching the device again.
           try {
             const prst = await Bridge.readSlotPrst(slot);
-            store.bytes.set(slot, prst); store.names.set(slot, PRST.readName(prst) || name);
+            guard();
+            store.bytes.set(slot, prst); store.names.set(slot, C.readName(prst) || name);
             scanState.written++;
             persistSlot(slot);
-          } catch { scanState.errors++; }
+          } catch (e) { if (e && e.abort) throw e; scanState.errors++; }
           scanState.done++;
         }
-        invalidate();
       } catch (e) { scanState.error = e.message; }
-      finally { scanState.running = false; }
+      finally { if (store === st) invalidate(); scanState.running = false; }
     })();
     return J({ ok: true });
   }
@@ -372,7 +464,7 @@
   // scan" empty state entirely.
   function hasFullScanCache() {
     const cache = lsGet(LS_SCAN, null);
-    return !!(cache && store && cache.profileKey === store.profile.key && cache.slots && Object.keys(cache.slots).length >= 100);
+    return !!(cache && store && cache.profileKey === store.profile.key && cache.slots && Object.keys(cache.slots).length >= store.profile.slots);
   }
 
   // --- install the interceptor ------------------------------------------------
@@ -393,7 +485,7 @@
   function setSlotBytes(slot, prst) {
     if (!store) return;
     const u = prst instanceof Uint8Array ? prst : Uint8Array.from(prst);
-    store.bytes.set(slot, u); store.names.set(slot, PRST.readName(u)); invalidate();
+    store.bytes.set(slot, u); store.names.set(slot, store.codec.readName(u)); invalidate();
     persistSlot(slot);
   }
 
@@ -406,6 +498,6 @@
     return out;
   }
 
-  root.__staticApi = { handle, ensureLoaded, setSlotBytes, getAllSlotBytes, hasFullScanCache }; // for tests + Explorer cache sync
+  root.__staticApi = { handle, ensureLoaded, switchProfile, setSlotBytes, getAllSlotBytes, hasFullScanCache }; // for tests + Explorer cache sync
   console.log("[static_api] active — /api/device/* served client-side");
 })(typeof self !== "undefined" ? self : this);

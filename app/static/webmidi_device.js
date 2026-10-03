@@ -1,10 +1,16 @@
 "use strict";
 /*
- * webmidi_device.js — read/select client for the GP-5 / GP-50 over WebMIDI.
+ * webmidi_device.js — read/select client for the GP-5 / GP-50 / GP-150 over WebMIDI.
  *
- * The browser-side twin of patch/live_read.py + patch/select_patch.py: same
- * CRC-8/0x07, same nibble framing, same reassembly. Proven byte-for-byte against
- * the Python path on live hardware (see re/DEVICE_READ.md, the WebMIDI section).
+ * GP-5 / GP-50 ("legacy" transport): the browser-side twin of patch/live_read.py +
+ * patch/select_patch.py: same CRC-8/0x07, same nibble framing, same reassembly.
+ * Proven byte-for-byte against the Python path on live hardware (see
+ * re/DEVICE_READ.md, the WebMIDI section).
+ *
+ * GP-150 ("ht" transport, profile.transport === "ht"): every call routes to an
+ * HtTransport session (ht_transport.js + ht_proto.js, loaded before this file).
+ * No bulk name read exists there, so readNames() is [] and a scan reads each slot
+ * (readSlotOrNull: null = empty slot); selectSlot is a read request with flag 0.
  *
  * READ + SELECT, plus one gated raw-send primitive (_sendStream) used only by
  * webmidi_write.js. All patch-write building/validation/gating lives there; this
@@ -12,12 +18,14 @@
  * bytes without an explicit confirm+validated. A bad write can wedge the pedal
  * (power-cycle to recover), so that gate is load-bearing.
  *
- * Needs window.PRST (prst.js) for device profiles + rebuild(). Chrome/Edge only.
+ * Needs window.PRST (prst.js) for device profiles + rebuild(), and for the GP-150
+ * window.HtProto + window.HtTransport. Chrome/Edge only.
  *
  *   const dev = await WebMidiDevice.connect();      // {key,name}; throws if none
  *   const names = await WebMidiDevice.readNames();  // [{slot,name}, ...]
  *   await WebMidiDevice.selectSlot(7);              // Program Change (non-destructive)
  *   const prst = await WebMidiDevice.readSlotPrst(7); // select + 0x41 + rebuild -> Uint8Array
+ *   const p = await WebMidiDevice.readSlotOrNull(7);  // GP-150: null for an empty slot
  */
 (function (root) {
   const PRST = root.PRST;
@@ -74,23 +82,31 @@
     return names;
   }
 
-  // GP-50 first so the "GP-5" substring can't shadow it.
+  // GP-150 first (its own protocol), then GP-50 before "GP-5" (substring).
   const findPort = (map) => {
     const ports = [...map.values()];
-    return ports.find((p) => (p.name || "").includes("GP-50"))
+    return ports.find((p) => (p.name || "").includes("GP-150"))
+      || ports.find((p) => (p.name || "").includes("GP-50"))
       || ports.find((p) => (p.name || "").includes("GP-5")) || null;
   };
   const profileForPort = (name) =>
-    (name || "").includes("GP-50") ? PRST.GP50 : PRST.GP5;
+    (name || "").includes("GP-150") ? PRST.GP150 : (name || "").includes("GP-50") ? PRST.GP50 : PRST.GP5;
 
   // --- connection state ------------------------------------------------------
   let access = null, input = null, output = null, profile = null;
   let namesCache = null;
   let chain = Promise.resolve(); // serializes all device requests (one at a time)
+  let ht = null; // HtTransport session when profile.transport === "ht" (it owns its own queue)
+  const isHt = () => !!(profile && profile.transport === "ht");
 
   function assertReady() {
     if (!input || !output) throw new Error("not connected — call WebMidiDevice.connect() first");
     if (!root.PRST) throw new Error("prst.js (window.PRST) is not loaded");
+    if (isHt() && !ht) throw new Error("GP-150 session is not open — reconnect");
+  }
+  function assertSlot(slot) {
+    const n = profile ? profile.slots : 100;
+    if (!(Number.isInteger(slot) && slot >= 0 && slot < n)) throw new Error(`slot ${slot} out of range 0..${n - 1}`);
   }
 
   // Run `fn` after every previously-queued request has finished + settled.
@@ -133,13 +149,27 @@
 
   async function connect() {
     if (!navigator.requestMIDIAccess) throw new Error("this browser has no WebMIDI (use Chrome or Edge)");
+    if (ht) { ht.close(); ht = null; } // a reconnect must not leave the old session's input handler behind
     access = await navigator.requestMIDIAccess({ sysex: true });
     input = findPort(access.inputs);
     output = findPort(access.outputs);
-    if (!input || !output) throw new Error("no GP-5 / GP-50 MIDI port found — connect it and close Valeton Suite");
+    if (!input || !output) { disconnect(); throw new Error("no GP-5 / GP-50 / GP-150 MIDI port found — connect it and close Valeton Suite"); }
     profile = profileForPort(input.name);
     namesCache = null;
+    if (isHt()) {
+      if (!root.HtTransport || !root.HtProto) { disconnect(); throw new Error("ht_proto.js / ht_transport.js are not loaded"); }
+      ht = root.HtTransport.create(input, output);
+      let ok = false;
+      try { ok = await ht.hello(); } catch { ok = false; }
+      if (!ok) { disconnect(); throw new Error("GP-150 did not answer the handshake — unplug/replug USB or close Valeton Suite"); }
+    }
     return { key: profile.key, name: profile.name, port: input.name };
+  }
+
+  function disconnect() {
+    if (ht) ht.close();
+    ht = null;
+    input = output = access = profile = namesCache = null;
   }
 
   const isConnected = () => !!(input && output);
@@ -147,6 +177,7 @@
 
   function readNames() {
     assertReady();
+    if (isHt()) return Promise.resolve((namesCache = [])); // no bulk name read on the GP-150: scan supplies names
     return serialize(async () => {
       const { blob } = await exchange([0xf0, ...toWire(buildRequest(SEL_NAMES)), 0xf7]);
       namesCache = splitNames(blob);
@@ -158,11 +189,13 @@
   // names) and return the longest reassembled blob. Same transport as readNames.
   function readBankBlob(selector) {
     assertReady();
+    if (isHt()) return Promise.reject(new Error("SnapTone/IR catalog read is not supported on the GP-150 yet"));
     return serialize(async () => (await exchange([0xf0, ...toWire(buildRequest(selector)), 0xf7])).blob);
   }
 
   function selectSlot(slot) {
     assertReady();
+    if (isHt()) { assertSlot(slot); return ht.selectSlot(slot); }
     if (!(slot >= 0 && slot <= 99)) throw new Error(`slot ${slot} out of range 0..99`);
     return serialize(async () => {
       output.send([0xc0, slot & 0x7f]); // Program Change — non-destructive
@@ -174,6 +207,9 @@
   // the patch (the device body carries no name). One retry on a short/raced read.
   function readActivePrst(name = "") {
     assertReady();
+    if (isHt()) {
+      return ht.readPreset(root.HtProto.SLOT_ACTIVE).then((p) => { if (!p) throw new Error("the GP-150 sent no active preset"); return p; });
+    }
     return serialize(async () => {
       const wire = [0xf0, ...toWire(buildRequest(SEL_BODY)), 0xf7];
       const strip = (blob) => (blob[0] === CATSEL && blob[1] === SEL_BODY ? blob.slice(2) : blob);
@@ -194,10 +230,38 @@
   // from readNames() (fetched once if not already cached).
   async function readSlotPrst(slot) {
     assertReady();
+    if (isHt()) {
+      const p = await readSlotOrNull(slot);
+      if (!p) throw new Error(`slot ${slot} is empty (no reply)`);
+      return p;
+    }
     if (!namesCache) await readNames();
     const hit = (namesCache || []).find((n) => n.slot === slot);
     await selectSlot(slot);
     return readActivePrst(hit ? hit.name : `slot${slot}`);
+  }
+
+  // One slot's .prst, or null when the slot is empty (GP-150 only: the pedal stays
+  // silent). GP-5/GP-50 have no "empty" read, so this is readSlotPrst there.
+  async function readSlotOrNull(slot) {
+    assertReady();
+    if (isHt()) { assertSlot(slot); return ht.readPreset(slot); }
+    return readSlotPrst(slot);
+  }
+
+  // Read `slots` (an array, or a count = 0..n-1) one at a time, calling
+  // onEach({slot, prst}) — prst null for an empty slot — or onEach({slot, error}).
+  // Resolves {read, empty, errors}. Never aborts on a per-slot failure.
+  async function scanSlots(slots, onEach) {
+    const list = Array.isArray(slots) ? slots : Array.from({ length: slots }, (_, i) => i);
+    const sum = { read: 0, empty: 0, errors: 0 };
+    for (const slot of list) {
+      let prst = null;
+      try { prst = await readSlotOrNull(slot); } catch (error) { sum.errors++; if (onEach) await onEach({ slot, error }); continue; }
+      if (prst) sum.read++; else sum.empty++;
+      if (onEach) await onEach({ slot, prst });
+    }
+    return sum;
   }
 
   // Gated raw sender for a pre-built, pre-validated write stream. Owns the port
@@ -209,6 +273,7 @@
     assertReady();
     const { confirm = false, validated = false, ackWaitMs = 150 } = opts || {};
     if (!(confirm && validated)) throw new Error("refusing to send: _sendStream requires confirm && validated");
+    if (isHt()) throw new Error("writing to the GP-150 is not supported yet (read-only)");
     return serialize(async () => {
       let acks = 0, pending = 0;
       input.onmidimessage = (e) => { if (e.data[0] === 0xf0) pending++; };
@@ -228,8 +293,9 @@
   }
 
   root.WebMidiDevice = {
-    connect, disconnect: () => { input = output = access = profile = namesCache = null; },
-    isConnected, device, readNames, readBankBlob, selectSlot, readActivePrst, readSlotPrst, _sendStream,
+    connect, disconnect,
+    isConnected, device, readNames, readBankBlob, selectSlot, readActivePrst, readSlotPrst, readSlotOrNull, scanSlots, _sendStream,
+    _ht: () => ht, // the GP-150 HtTransport session (null otherwise) — tests / webmidi_write
     // exposed for tests / the probe
     _codec: { crc8, buildRequest, toWire, nibDecode, reassemble, splitNames, findPort },
   };

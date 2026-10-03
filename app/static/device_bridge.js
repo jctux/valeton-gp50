@@ -30,6 +30,13 @@
       return dev().readSlotPrst(slot);
     },
 
+    // GP-150: a slot's .prst, or null for an empty slot (the pedal stays silent).
+    // GP-5/GP-50: same as readSlotPrst.
+    async readSlotOrNull(slot) {
+      if (!Bridge.connected()) throw new Error("not connected");
+      return dev().readSlotOrNull(slot);
+    },
+
     async selectSlot(slot) {
       if (!Bridge.connected()) throw new Error("not connected");
       return dev().selectSlot(slot);
