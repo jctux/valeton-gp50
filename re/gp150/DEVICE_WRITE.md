@@ -6,7 +6,7 @@ Date: 2026-10-03. Branch `gp150-support`.
 |---|---|
 | Import stream (`device_write.build_gp150_write_stream` / `webmidi_write.js`) | Byte-exact against Suite's captured import (`test_device_write_gp150.py`, `test_write_gp150_js.mjs`). |
 | Gated sender (`device_write.send_stream(..., session=s)`, `ht_transport.js writePreset`) | Tested against a scripted fake pedal only. |
-| `patch/ht_write_verify.py` (the six-step protocol below) | Tested against a scripted fake pedal only (`app/tests/test_ht_write_verify.py`). **Not yet run against the pedal.** |
+| `patch/ht_write_verify.py` (the seven-step protocol below, steps 0–6) | Tested against a scripted fake pedal only (`app/tests/test_ht_write_verify.py`). **Not yet run against the pedal.** |
 | Hardware run (bottom of this file) | **PENDING — not run.** Nothing in that section has been observed yet. |
 | Gate | `WRITE_VERIFIED["gp150"] = False` in `patch/device_write.py` **and** `app/static/webmidi_write.js`. |
 
@@ -19,13 +19,14 @@ and Suite number presets from 001, so display number = slot + 1 (slot 199 = pres
 writes. A second session on the port would ACK the pedal's 0x08 twice. Every write goes
 through `device_write.send_stream(None, pk, confirm=True, validated=ok, allow_unverified=True, session=s)`.
 The script never changes `WRITE_VERIFIED`. It prints one `N PASS|FAIL <step> — <detail>`
-line per step and **stops at the first FAIL**. It writes nothing unless step 2 proved the
-target slot empty.
+line per step, steps 0–6 (seven lines), and **stops at the first FAIL**. It writes nothing
+unless steps 0 and 2 showed the target slot empty.
 
 | # | Step | PASS means |
 |---|---|---|
+| 0 | scan precondition | Checked **before any MIDI port is opened.** `device_scan_gp150/scan_summary.json` from `./.venv-midi/bin/python patch/ht_scan.py scan` must exist, must not be aborted, must cover all 200 slots, and must record `<slot>` as `empty-acked`. Otherwise this step FAILs, naming the scan command. The line shows the file's date and the counts, and lists any slots the scan could not read (those are NOT in the backup). |
 | 1 | hello + read active | The pedal answered the handshake. The active preset read back as a 1128-byte GP-150 preset (kept for step 6) and is **not** the target slot; if it is, step 1 refuses. |
-| 2 | target slot is empty | **Two** reads of `<slot>` both came back empty with `last_status=empty-acked`. Each waits 3 s of silence after the ACK, then watches the input for 2 s more. It FAILs on a preset, on a late preset stream (a discarded 0x70 chunk), on corrupt frames, or on `empty-unacked`: with no ACK, an empty slot and a lost request look the same. There is no override. |
+| 2 | target slot is empty | **Two** reads of `<slot>` both came back empty with `last_status=empty-acked`. Each waits 3 s of silence after the ACK, then watches the input for 2 s more. It FAILs on a preset, on a late preset stream (a discarded 0x70 chunk), on a partial stream the read retried past (any chunk frame in any of its exchanges), on corrupt frames, or on `empty-unacked`: with no ACK, an empty slot and a lost request look the same. There is no override. |
 | 3 | import WRITE TEST | Two backups are saved first, and their paths printed (`  backup: …`), under `device_scan_gp150/write_verify_backup/`: the active preset, and exactly what goes to `<slot>`. Then a copy of slot 0, renamed "WRITE TEST", was imported to `<slot>`. All 10 chunks went out and the pedal sent its 0x08 "import done". The line says `ACK` or `NO ACK of the transfer id`. |
 | 4 | read back == sent | `<slot>` reads back byte-identical to what was sent, except 0x0A (the import sends 0x5C, exports carry 0x58) and 0x0D..0x0F (device-written). It prints `back[0x0A]` and the ignored differences. |
 | 5 | import blank, read back | `blank(<slot>)` was imported the same way and reads back named "New GEN.". The slot is left holding that blank, so it is no longer empty. |
@@ -45,10 +46,12 @@ slot may or may not hold the import.
 
 Setup: GP-150 on USB, Valeton Suite **closed**, `.venv-midi` present (see `DEVICE_READ.md`).
 
-**REQUIRED before the write script:** a completed `./.venv-midi/bin/python patch/ht_scan.py scan`,
-with all 200 slots saved under `device_scan_gp150/`. That scan is the real backup.
-Record its `done:` line in `DEVICE_READ.md` step 3. If it reports **un-ACKed** empty slots,
-step 2 here will refuse; stop and report back.
+**REQUIRED before the write script, and enforced by its step 0:** a completed
+`./.venv-midi/bin/python patch/ht_scan.py scan`. Run it with no `--out`, so all 200 slots are
+saved under `device_scan_gp150/` with `device_scan_gp150/scan_summary.json`. That scan is the
+real backup. Record its `done:` line in `DEVICE_READ.md` step 3. The target slot must be
+listed as empty-ACKed. If the scan reports **un-ACKed** empty slots, steps 0 and 2 here will
+refuse; stop and report back.
 
 Run, from the repo root:
 
@@ -67,10 +70,11 @@ echo "exit ${pipestatus[1]}"                            # zsh, immediately after
 | Precondition: the `done:` line of the completed `ht_scan.py scan` | _(fill in)_ |
 | Pre-check: `./.venv-midi/bin/python patch/ht_scan.py read 199` | output (must say `slot 199: empty (…)`): _(fill in)_ |
 | Command | `./.venv-midi/bin/python -u patch/ht_write_verify.py 199 2>&1 \| tee device_scan_gp150/write_verify_199.log` |
-| Exit status (`echo "exit ${pipestatus[1]}"` right after the tee pipeline: 0 = six PASS, 1 = a FAIL, 2 = bad arguments, 130 = Ctrl-C) | _(fill in)_ |
+| Exit status (`echo "exit ${pipestatus[1]}"` right after the tee pipeline: 0 = all seven steps PASS, 1 = a FAIL, 2 = bad arguments, 130 = Ctrl-C) | _(fill in)_ |
 
 | # | Step | Line printed (PASS / FAIL + detail, verbatim) |
 |---|---|---|
+| 0 | scan precondition | _(fill in)_ |
 | 1 | hello + read active | _(fill in)_ |
 | 2 | target slot is empty | _(fill in)_ |
 | 3 | import WRITE TEST | _(fill in)_ |
@@ -107,8 +111,10 @@ _(paste the whole output of ht_write_verify.py here)_
    no answer), power-cycle it.
 4. Record the full console output above, plus steps 2–3, under "Failure record".
 
-A FAIL at step 1 or 2 wrote nothing (the STOPPED block says so). Re-run only after
-fixing the cause:
+A FAIL at step 0, 1 or 2 wrote nothing (the STOPPED block says so; step 0 did not even
+open a MIDI port). Re-run only after fixing the cause:
+- for step 0: run the full scan (`./.venv-midi/bin/python patch/ht_scan.py scan`) to completion,
+  or pick a slot it lists as empty-ACKed.
 - for "holds a preset" / "probably NOT empty": pick another slot that the scan lists as empty.
 - for "gave no ACK": do not re-run; report back.
 
