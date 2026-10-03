@@ -151,11 +151,11 @@ def write_order(b: bytearray, order: Sequence[int]) -> None:
     b[ORDER_OFF:ORDER_OFF + N_BLOCKS] = bytes(order)
 
 
-def engine_for(pos: int, slot: int, type_: int, enabled: int, params: Sequence[float]) -> int:
-    """spec §6-7. Disabled -> bypass engine; AMP (pos 0) by type/params; type
-    overrides; else the canonical engine of the chain position."""
-    if not enabled:
-        return ENGINE_BYPASS
+def engine_for(pos: int, slot: int, type_: int, params: Sequence[float]) -> int:
+    """Engine byte for a block at chain position `pos`. Engines are written by the
+    firmware (a disabled block keeps its engine); this is only used when a block's
+    type or position changes. AMP (pos 0) rules are best effort (spec 6-7); else the
+    (slot, type) overrides; else the canonical engine of the chain position."""
     if pos == 0:
         p = list(params) + [0.0] * N_PARAMS
         if type_ == 33 or type_ in (2, 7):
@@ -200,11 +200,9 @@ def param_floats(b: bytes) -> List[float]:
     return out
 
 
-def _refresh_engines(b: bytearray) -> None:
-    order = read_order(b)
-    for pos in range(N_BLOCKS):
-        blk = block_at(b, pos)
-        set_block(b, pos, engine=engine_for(pos, order[pos], blk["type"], blk["enabled"], blk["params"]))
+def _refresh_engine(b: bytearray, pos: int, slot: int) -> None:
+    blk = block_at(b, pos)
+    set_block(b, pos, engine=engine_for(pos, slot, blk["type"], blk["params"]))
 
 
 def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
@@ -212,13 +210,16 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     _check(prst)
     edits = edits or {}
     b = bytearray(prst)
+    old_order = read_order(b)
     if edits.get("order") is not None:
         write_order(b, edits["order"])
     order = read_order(b)
+    dirty = set(slot for pos, slot in enumerate(order) if old_order.index(slot) != pos)
     pos_of = {slot: pos for pos, slot in enumerate(order)}
     for slot, key in (edits.get("models") or {}).items():
         key = int(key)
         pos = pos_of[int(slot)]
+        dirty.add(int(slot))
         set_block(b, pos, type=key & 0xFF, subtype=(key >> 8) & 0xFF, ext=(key >> 16) & 0xFF)
         if int(slot) == AMP_SLOT and (key & 0xFF) in (2, 7):
             set_block(b, pos, ext=1)
@@ -233,7 +234,8 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     write_vol_bpm(b, s.get("patch_vol"), s.get("bpm"))
     if edits.get("name") is not None:
         write_name(b, str(edits["name"]))
-    _refresh_engines(b)
+    for slot in sorted(dirty):
+        _refresh_engine(b, pos_of[slot], slot)
     return bytes(b)
 
 
