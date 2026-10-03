@@ -16,6 +16,9 @@
  *   await s.hello();                  // true when the pedal answers the handshake
  *   const prst = await s.readPreset(7); // Uint8Array(1128), or null for an empty slot
  *   await s.selectSlot(7);            // switch the pedal (read request with flag 0)
+ *   await s.writePreset(packets);     // import stream -> {sent, acks, notified}. UNGATED
+ *                                     // transport primitive: the app goes through
+ *                                     // WebMidiWrite.writeSlot (WRITE_VERIFIED gate)
  */
 (function (root) {
   const DEFAULTS = {
@@ -24,6 +27,9 @@
     idleMs: 800, // a stream with no new chunk for this long is incomplete
     emptyTimeoutMs: 1500, // no chunk this long after the ACK (or the send) = empty slot
     tickMs: 20,
+    writePaceMs: 20, // gap between import chunks (the pedal ACKs once, after the final one)
+    notifyTimeoutMs: 3000, // wait this long after the import ACK for the 0x08 "import done"
+    transferId: 0x24, // writePreset(prst): the transfer id Suite used in the captured import
     log: null, // (level, message, detail) => void; default: console.warn for "warn"
   };
   const NOT_RESPONDING = "pedal not responding — close Valeton Suite if it's open, and check the USB cable";
@@ -83,11 +89,19 @@
     //    accepts (default: any), or idleMs after the ACK.
     //  - stream: done on the final (short) chunk (assembled), or `silent` when no
     //    chunk arrived emptyTimeoutMs after the ACK (or after the send if no ACK).
-    function exchange(wire, { stream = false, timeoutMs = o.timeoutMs, until = null } = {}) {
-      let want = null; // the request's tx id; the device's ACK echoes it
-      try { const rf = HT.parseFrame(wire); if (rf.family !== HT.FAMILY_ACK && !HT.isChunk(rf)) want = rf.tx4[3]; } catch { /* raw bytes: any ACK counts */ }
+    // Multi-frame requests (writePreset): `lead` frames go out first, paceMs apart,
+    // with this exchange's handler already listening; `wire` is the last frame and
+    // every timer starts when it is sent. `ackId` names the ACK that counts
+    // (default: the request's tx id; any ACK for raw bytes / chunk frames);
+    // `idleMs` overrides how long to wait after that ACK.
+    function exchange(wire, { stream = false, timeoutMs = o.timeoutMs, until = null, lead = [], paceMs = 0, ackId = null, idleMs = o.idleMs } = {}) {
+      let want = ackId; // the ACK id that counts; by default the request's tx id
+      if (want === null) {
+        try { const rf = HT.parseFrame(wire); if (rf.family !== HT.FAMILY_ACK && !HT.isChunk(rf)) want = rf.tx4[3]; } catch { /* raw bytes: any ACK counts */ }
+      }
       return new Promise((resolve) => {
-        const frames = [], chunks = [], t0 = Date.now();
+        const frames = [], chunks = [];
+        let t0 = Date.now(), sending = lead.length > 0; // sending: lead frames still going out
         let ack = false, ackAt = 0, lastChunkAt = 0, done = false, tick = null;
         let sawTail = false; // non-zero-offset chunks seen with no offset-0 chunk before them
         const finish = (extra) => {
@@ -124,16 +138,25 @@
         current = handler;
         abortCurrent = () => finish({ error: new Error("session closed"), aborted: true });
         tick = setInterval(() => {
+          if (sending) return; // no verdicts until the last frame is out
           const now = Date.now();
           if (stream) {
             if (chunks.length) { if (now - lastChunkAt > o.idleMs) finish({ error: new Error("preset stream stopped before its final chunk") }); }
             else if (now - (ack ? ackAt : t0) > o.emptyTimeoutMs) {
               finish(sawTail ? { error: new Error("preset stream arrived without its first chunk") } : { silent: true });
             }
-          } else if (ack && now - ackAt > o.idleMs) finish();
+          } else if (ack && now - ackAt > idleMs) finish();
           if (now - t0 > timeoutMs + (stream ? o.emptyTimeoutMs : 0)) finish({ timeout: true });
         }, o.tickMs);
-        try { send(wire); } catch (err) { finish({ error: err }); }
+        if (!sending) { try { send(wire); } catch (err) { finish({ error: err }); } return; }
+        (async () => {
+          try {
+            for (const w of lead) { if (done) return; send(w); await sleep(paceMs); }
+            if (done) return;
+            t0 = Date.now(); sending = false;
+            send(wire);
+          } catch (err) { finish({ error: err }); }
+        })();
       });
     }
 
@@ -232,13 +255,76 @@
       });
     }
 
+    // --- preset import (the GP-150 write) -------------------------------------
+    const isImportDone = (f) => f.family === HT.FAMILY_IMPORT_DONE && !HT.isChunk(f);
+    const hexOf = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+    // `x` = a 1128-byte preset (imported to the slot in its own index byte 0x04) or
+    // the 0x70 import frames themselves (e.g. WebMidiWrite's validated stream). The
+    // frames must be one 0x70 stream that assembles into an import payload.
+    function importFrames(x) {
+      const isPreset = x instanceof Uint8Array || (Array.isArray(x) && typeof x[0] === "number");
+      if (isPreset) {
+        const prst = Uint8Array.from(x);
+        if (prst.length !== HT.PRESET_LEN || prst[0] !== 0x11 || prst[1] !== 0x30 || prst[2] !== 0x64 || prst[3] !== 0x04) {
+          throw new Error("writePreset: not a GP-150 .prst (expected 1128 bytes starting 11 30 64 04)");
+        }
+        x = HT.importStream(o.transferId, prst);
+      }
+      const packets = Array.from(x || [], (w) => Uint8Array.from(w));
+      if (!packets.length) throw new Error("writePreset: nothing to send");
+      const frames = packets.map((w, i) => {
+        let f;
+        try { f = HT.parseFrame(w); } catch (err) { throw new Error(`writePreset: packet ${i}: ${err.message}`); }
+        if (f.family !== HT.FAMILY_PATCH || !HT.isChunk(f)) throw new Error(`writePreset: packet ${i} is not a patch (0x70) chunk`);
+        return f;
+      });
+      let payload;
+      try { payload = HT.assembleStream(frames).payload; } catch (err) { throw new Error(`writePreset: the frames do not assemble into one import stream (${err.message})`); }
+      if (!HT.HEAD_IMPORT.every((v, i) => payload[i] === v)) throw new Error("writePreset: the stream does not carry an import payload (01 03 11 30)");
+      return { packets, transferId: frames[0].tx4[3], slot: HT.presetFromPayload(payload)[4] };
+    }
+
+    // Import a preset: every chunk paceMs apart, then wait for the pedal's ACK (id =
+    // transfer id) and its family-0x08 "import done" — all inside ONE exchange on
+    // this session's own handler. onMessage already ACKs that 0x08 (it carries a tx
+    // id); nothing here ACKs it again. Resolves {sent, acks, notified: true}; rejects
+    // when the 0x08 never comes (ACK or not) or carries another payload than Suite's
+    // capture (09 03 11 30). UNGATED: callers go through WebMidiWrite.writeSlot.
+    function writePreset(x, wopts) {
+      const w = Object.assign({ paceMs: o.writePaceMs, notifyTimeoutMs: o.notifyTimeoutMs }, wopts || {});
+      let s;
+      try { s = importFrames(x); } catch (err) { return Promise.reject(err); }
+      const { packets, transferId, slot } = s;
+      return job(async () => {
+        if (closed) throw sessionClosed();
+        const r = await exchange(packets[packets.length - 1], {
+          lead: packets.slice(0, -1), paceMs: w.paceMs, ackId: transferId, until: isImportDone,
+          idleMs: w.notifyTimeoutMs, timeoutMs: o.timeoutMs + w.notifyTimeoutMs,
+        });
+        if (r.aborted) throw r.error;
+        if (r.error) throw new Error(`GP-150 import to slot ${slot} failed while sending: ${r.error.message}`);
+        const note = r.frames.find(isImportDone);
+        if (!note) {
+          if (!r.ack) throw new Error(`GP-150 did not ACK the import to slot ${slot} (${NOT_RESPONDING}). Read slot ${slot} back before retrying: it may or may not have been written.`);
+          throw new Error(`GP-150 ACKed the import to slot ${slot} but sent no 0x08 'import done' within ${w.notifyTimeoutMs} ms — read slot ${slot} back before trusting or retrying the write`);
+        }
+        let got;
+        try { got = HT.shortPayload(note); } catch (err) { throw new Error(`GP-150 sent an unreadable 0x08 notification after the import (${err.message})`); }
+        if (hexOf(got) !== hexOf(HT.IMPORT_DONE_PAYLOAD)) {
+          throw new Error(`GP-150 answered the import to slot ${slot} with an unexpected 0x08 payload ${hexOf(got)} (Suite capture: ${hexOf(HT.IMPORT_DONE_PAYLOAD)}) — read slot ${slot} back`);
+        }
+        return { sent: packets.length, acks: r.ack ? 1 : 0, notified: true };
+      });
+    }
+
     function close() {
       closed = true;
       if (abortCurrent) abortCurrent();
       if (input.onmidimessage === onMessage) input.onmidimessage = null;
     }
 
-    return { request, hello, readPreset, selectSlot, nextTx, close, stats: () => ({ badFrames }), _send: send };
+    return { request, hello, readPreset, selectSlot, writePreset, nextTx, close, stats: () => ({ badFrames }), _send: send };
   }
 
   const API = { create, DEFAULTS, NOT_RESPONDING };

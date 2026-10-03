@@ -306,8 +306,10 @@ def session(pedal):
 
 
 def send(pk, pedal, **kw):
+    # happy paths return on the 0x08, so a generous notify_timeout costs nothing;
+    # the tests that must time out pass a short one
     opts = dict(confirm=True, validated=True, allow_unverified=True, session=session(pedal),
-                pace=0.0, notify_timeout=0.3)
+                pace=0.0, notify_timeout=2.0)
     opts.update(kw)
     return dw.send_stream(None, pk, **opts)
 

@@ -445,13 +445,13 @@ def test_exchange_idle_override_waits_longer_after_the_ack():
     p = FakePedal()
     s = session(p, **FAST)  # idle 0.06
     p.emit(ht.ack(0x24))
-    p.emit(MSG["import_notify_08"], delay=0.15)
+    p.emit(MSG["import_notify_08"], delay=0.4)
     r = s.exchange(chunk, ack_id=0x24, until=is_note)
     assert r.ack and not any(is_note(f) for f in r.frames)  # gave up 0.06 s after the ACK
-    s.pump(0.2)  # (the late notify is ACKed by the pump, then dropped)
+    s.pump(0.5)  # (the late notify is ACKed by the pump, then dropped)
     p.emit(ht.ack(0x24))
-    p.emit(MSG["import_notify_08"], delay=0.15)
-    r = s.exchange(chunk, ack_id=0x24, until=is_note, idle=0.5, timeout=1.0)
+    p.emit(MSG["import_notify_08"], delay=0.4)
+    r = s.exchange(chunk, ack_id=0x24, until=is_note, idle=2.0, timeout=3.0)
     assert r.ack and any(is_note(f) for f in r.frames) and not r.timeout
 
 

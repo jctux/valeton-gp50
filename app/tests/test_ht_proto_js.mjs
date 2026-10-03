@@ -54,6 +54,13 @@ const theirs = stream("import_stream_slot1_");
 check("import chunk count", ours.length === theirs.length);
 ours.forEach((w, i) => check(`import chunk ${i}`, theirs[i] && hex(w) === hex(theirs[i])));
 
+// short-message payloads: host flag 00, the pedal's 0x08 import notify flag 01
+check("shortPayload request", hex(HT.shortPayload(HT.parseFrame(MSG.export_req_slot1))) === "0303113011300200000001");
+const note = HT.parseFrame(MSG.import_notify_08);
+check("shortPayload 0x08 notify", note.family === HT.FAMILY_IMPORT_DONE && note.body[0] === 0x01 && hex(HT.shortPayload(note)) === hex(HT.IMPORT_DONE_PAYLOAD) && hex(HT.IMPORT_DONE_PAYLOAD) === "09031130");
+check("shortPayload refuses a chunk", throws(() => HT.shortPayload(HT.parseFrame(MSG.import_stream_slot1_0))));
+check("shortPayload refuses an ACK", throws(() => HT.shortPayload(HT.parseFrame(MSG.import_done_ack))));
+
 // python oracle: same bytes from patch/ht_proto.py
 const py = [".venv-app/bin/python", "python3"].map((p) => (p.includes("/") ? resolve(repoRoot, p) : p)).find((p) => !p.includes("/") || existsSync(p));
 const pyHex = execFileSync(py, ["-c", `

@@ -10,7 +10,9 @@
  * GP-150 ("ht" transport, profile.transport === "ht"): every call routes to an
  * HtTransport session (ht_transport.js + ht_proto.js, loaded before this file).
  * No bulk name read exists there, so readNames() is [] and a scan reads each slot
- * (readSlotOrNull: null = empty slot); selectSlot is a read request with flag 0.
+ * (readSlotOrNull: null = empty slot); selectSlot is a read request with flag 0;
+ * _sendStream hands the import stream to the session's writePreset, refused while
+ * WebMidiWrite.WRITE_VERIFIED.gp150 is false unless allowUnverified.
  *
  * READ + SELECT, plus one gated raw-send primitive (_sendStream) used only by
  * webmidi_write.js. All patch-write building/validation/gating lives there; this
@@ -279,11 +281,25 @@
   // (build/validate/WRITE_VERIFIED/confirm) lives in webmidi_write.js; this just
   // refuses to move bytes without an explicit confirm+validated from that layer.
   // Paces like Suite: one block, wait for the device ACK (shallow queue), repeat.
+  // GP-150: the HT import stream goes to the session's writePreset (its queue, its
+  // input handler, its auto-ACK of the 0x08) — and only while
+  // WebMidiWrite.WRITE_VERIFIED.gp150 is true or the caller passes allowUnverified.
   function _sendStream(packets, opts) {
     assertReady();
-    const { confirm = false, validated = false, ackWaitMs = 150 } = opts || {};
+    const { confirm = false, validated = false, ackWaitMs = 150, allowUnverified = false } = opts || {};
     if (!(confirm && validated)) throw new Error("refusing to send: _sendStream requires confirm && validated");
-    if (isHt()) throw new Error("writing to the GP-150 is not supported yet (read-only)");
+    const htFrames = (packets || []).some((w) => w && w[0] === 0xf0 && w[1] === 0x7f);
+    if (isHt()) {
+      const W = root.WebMidiWrite;
+      if (!allowUnverified && !(W && W.WRITE_VERIFIED && W.WRITE_VERIFIED.gp150 === true)) {
+        throw new Error("refusing to send: GP-150 writes are not verified on hardware yet (WRITE_VERIFIED.gp150 is false) — pass { allowUnverified: true } only for the supervised verification write");
+      }
+      if (!packets || !packets.length || packets.some((w) => !w || w[0] !== 0xf0 || w[1] !== 0x7f)) {
+        throw new Error("refusing to send: the GP-150 takes an HT import stream (F0 7F frames), not GP-5/GP-50 packets");
+      }
+      return ht.writePreset(packets);
+    }
+    if (htFrames) throw new Error(`refusing to send: GP-150 (HT) frames to a ${profile.name}`);
     return serialize(async () => {
       let acks = 0, pending = 0;
       input.onmidimessage = (e) => { if (e.data[0] === 0xf0) pending++; };
