@@ -18,10 +18,12 @@ pedal resend the whole stream), device short messages carrying a tx id ACKed.
 `Session` is importable without mido or a pedal: it opens the "GP-150" ports
 lazily, and tests inject fake ports (anything with `iter_pending()` yielding
 objects with `.type`/`.bytes()`, and `send(msg)`) plus `to_message`.
-patch/ht_write_verify.py (Task 12) builds on `Session().hello/read/send/inp`; the
-gated preset import lives in patch/device_write.py (send_stream(..., session=s)),
-which drives `Session.exchange(lead=...)` so the session's ACK duties stay the only
-ones. This CLI itself never writes.
+patch/ht_write_verify.py (Task 12) uses ONE Session's hello/read/pump for its reads;
+to prove a slot empty it temporarily raises `empty_timeout` and taps `log` for
+pump()'s "unsolicited frame family 0x70" line (a late preset stream; keep that
+text). Its writes go through the gated import in patch/device_write.py
+(send_stream(..., session=s)), which drives `Session.exchange(lead=...)` so the
+session's ACK duties stay the only ones. This CLI itself never writes.
 """
 from __future__ import annotations
 

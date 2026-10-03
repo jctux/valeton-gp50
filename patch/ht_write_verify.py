@@ -1,17 +1,24 @@
 #!/usr/bin/env python3
 """GP-150 write verification (plan Task 12) — run ONCE, by hand, with the user
-watching the pedal (pedal on USB, Valeton Suite closed, the target slot empty):
+watching the pedal (pedal on USB, Valeton Suite closed, the target slot empty).
+REQUIRED first: a completed `./.venv-midi/bin/python patch/ht_scan.py scan` (all 200
+slots saved under device_scan_gp150/) — that is the real backup.
 
-  ./.venv-midi/bin/python patch/ht_write_verify.py 199
+  ./.venv-midi/bin/python -u patch/ht_write_verify.py 199
 
 Six steps, each printed as `N PASS|FAIL <step> — <detail>`. It stops at the first
 FAIL, and it never writes unless step 2 proved the target slot EMPTY.
 
- 1. hello; read the active preset (kept for step 6)
- 2. read <slot>: must be empty; prints `last_status` (empty-acked = ACK, then
-    silence; empty-unacked = no ACK, but the pedal answered a hello)
- 3. import a copy of slot 0 renamed "WRITE TEST" into <slot>: the pedal must ACK
-    the import and send its 0x08 "import done"
+ 1. hello; read the active preset (kept for step 6); refuse if it IS <slot>
+ 2. prove <slot> empty: two reads, each with >= EMPTY_PROOF_TIMEOUT s of silence
+    after the ACK and LATE_STREAM_PUMP s of watching the input afterwards. FAIL if
+    either read returns a preset, if a preset chunk arrives late (the session
+    discards and logs it), if corrupt frames arrive, or if the pedal did not ACK
+    the request (`empty-unacked`: an empty slot and a lost request look the same)
+ 3. back up the active preset and the write-test preset under
+    device_scan_gp150/write_verify_backup/; import a copy of slot 0 renamed
+    "WRITE TEST" into <slot>: the pedal must ACK the import and send its 0x08
+    "import done"
  4. read <slot> back: byte-identical to what was sent, except 0x0A (the import
     sends 0x5C, exports carry 0x58; `back[0x0A]` is printed) and 0x0D..0x0F
     (device-written); the differing offsets are printed
@@ -40,6 +47,7 @@ from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
+BACKUP_DIR = os.path.join(ROOT, "device_scan_gp150", "write_verify_backup")  # gitignored
 from patch import device_write as dw  # noqa: E402
 from patch import ht_proto as ht  # noqa: E402
 from patch import ht_scan  # noqa: E402 — ht_scan.Session only
@@ -59,6 +67,13 @@ STEPS = [
 ]
 SHOW = 24  # differing offsets listed before "… (+n more)"
 READ_CMD = "./.venv-midi/bin/python patch/ht_scan.py read {slot}"
+# Step 2 (proving the slot empty). A single read(slot) -> None is not proof: a stream
+# that starts after the session's empty_timeout reads as "empty-acked" (its chunks
+# are then ACKed and discarded by Session.pump, which logs LATE_CHUNK_LOG), and two
+# lost requests plus an answered hello read as "empty-unacked".
+EMPTY_PROOF_TIMEOUT = 3.0  # s of silence after the ACK before the slot counts as empty
+LATE_STREAM_PUMP = 2.0  # s the input is watched after each empty read for a late stream
+LATE_CHUNK_LOG = "unsolicited frame family 0x70"  # ht_scan.Session.pump's line for a discarded preset chunk
 
 Result = Tuple[str, bool, str]  # (step label, passed, detail)
 
@@ -95,6 +110,11 @@ def _check_slot(slot) -> None:
         raise ValueError(f"slot {SOURCE_SLOT} holds the source of the test preset; pick an empty slot (199)")
 
 
+def display_number(slot: int) -> int:
+    """The preset number the pedal's display (and Suite) shows: 001-based."""
+    return slot + 1
+
+
 def _without_read_back_hint(msg: str, slot: int) -> str:
     # device_write's errors end with their own read-back hint; ours replaces it
     tail = " — " + dw._read_back(slot)
@@ -124,8 +144,10 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
             log("  nothing was written to the pedal.")
         log("  power-cycle the pedal if it stopped responding; record this output in re/gp150/DEVICE_WRITE.md")
 
-    log(f"GP-150 write verification: target slot {slot}, source slot {SOURCE_SLOT}, "
-        f"WRITE_VERIFIED['gp150'] = {dw.WRITE_VERIFIED.get('gp150')} (this run passes allow_unverified)")
+    log(f"GP-150 write verification: target slot {slot} (display {display_number(slot):03d}), "
+        f"source slot {SOURCE_SLOT}, WRITE_VERIFIED['gp150'] = {dw.WRITE_VERIFIED.get('gp150')} "
+        "(this run passes allow_unverified)")
+    log("precondition: a completed `ht_scan.py scan` of all 200 slots under device_scan_gp150/ (the real backup)")
     own = session is None
     s = session
     if own:
@@ -160,16 +182,53 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
         if active is None or not f150.detect(active):
             got = "nothing" if active is None else f"{len(active)} bytes"
             raise Fail(f"the active-preset read returned {got}, not a 1128-byte GP-150 preset")
+        if f150.read_index(active) == slot:
+            raise Fail(f"the active preset is slot {slot} ({_preset(active)}) — refusing to write the slot "
+                       "the pedal has loaded; select another preset on the pedal or pick another empty slot")
         state["active"] = active
         return f"handshake answered; active preset {_preset(active)}, {len(active)} bytes"
 
-    def step2() -> str:
-        cur = s.read(slot)
-        status = s.last_status
+    def empty_read(n: int) -> str:
+        """One guarded read of `slot`: a long empty_timeout, then LATE_STREAM_PUMP s
+        of watching for a late stream, with the session's log tapped for discarded
+        preset chunks. Raises Fail unless it shows the slot empty; nothing is written."""
+        late: List[str] = []
+        log0, timeout0, bad0 = s.log, s.empty_timeout, s.bad_frames
+
+        def tap(level: str, msg: str) -> None:
+            if LATE_CHUNK_LOG in msg:
+                late.append(msg)
+            log0(level, msg)
+
+        s.log, s.empty_timeout = tap, max(timeout0, EMPTY_PROOF_TIMEOUT)
+        try:
+            cur = s.read(slot)
+            status = s.last_status
+            if cur is None:
+                s.pump(LATE_STREAM_PUMP)
+        finally:
+            s.log, s.empty_timeout = log0, timeout0
         if cur is not None:
-            raise Fail(f"slot {slot} holds a preset ({_preset(cur)}; last_status={status}) — "
+            raise Fail(f"read {n}: slot {slot} holds a preset ({_preset(cur)}; last_status={status}) — "
                        "refusing to overwrite it; pick an empty slot")
-        return f"slot {slot} is empty (last_status={status}: {ht_scan.EMPTY_WHY.get(status or '', status)})"
+        if late:
+            raise Fail(f"read {n}: a preset stream arrived late ({len(late)} discarded 0x70 chunk(s)) — "
+                       f"slot {slot} is probably NOT empty; nothing was written")
+        if s.bad_frames != bad0:
+            raise Fail(f"read {n}: {s.bad_frames - bad0} corrupt frame(s) arrived — cannot prove slot {slot} "
+                       "empty; nothing was written")
+        if status == "empty-unacked":
+            raise Fail(f"read {n}: slot {slot} gave no ACK — cannot distinguish empty from lost request; "
+                       "answer DEVICE_READ question (a) with a full scan first")
+        if status != "empty-acked":
+            raise Fail(f"read {n}: unexpected read status {status!r}; nothing was written")
+        return status
+
+    def step2() -> str:
+        statuses = [empty_read(1), empty_read(2)]
+        return (f"slot {slot} read empty twice (last_status={', '.join(statuses)}: "
+                f"{ht_scan.EMPTY_WHY['empty-acked']}; {max(s.empty_timeout, EMPTY_PROOF_TIMEOUT):g} s of silence "
+                f"after each ACK, no late stream in the {LATE_STREAM_PUMP:g} s after)")
 
     def step3() -> str:
         src = s.read(SOURCE_SLOT)
@@ -178,6 +237,14 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
         b = bytearray(src)
         f150.write_name(b, TEST_NAME)
         state["src"] = bytes(b)
+        sent = bytearray(b)
+        f150.write_index(sent, slot)
+        try:  # before the first write: the active preset + exactly what goes to <slot>
+            for what, prst, n in (("active preset", state["active"], f150.read_index(state["active"])),
+                                  (f"write-test preset (for slot {slot})", bytes(sent), slot)):
+                log(f"  backup: {what} -> {ht_scan.save(prst, n, BACKUP_DIR)}")
+        except OSError as e:
+            raise Fail(f"could not save the backups under {BACKUP_DIR} ({e}); nothing was sent")
         res = write(state["src"])
         return f"copy of slot {SOURCE_SLOT} ({_preset(src)}) renamed {TEST_NAME!r} -> slot {slot}: {sent_note(res)}"
 
@@ -238,10 +305,11 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
         if own:
             s.close()
     log(f"all {len(STEPS)} steps PASS — copy this whole output into re/gp150/DEVICE_WRITE.md")
-    log("manual checks (record the answers in re/gp150/DEVICE_WRITE.md):")
-    log(f"  a. select slot {slot} on the pedal — does it play? (it now holds {BLANK_NAME!r})")
-    log("  b. optional, spec §8.2: write the ACTIVE preset back to itself renamed — does the "
-        "screen/sound update without a reselect? (procedure in re/gp150/DEVICE_WRITE.md)")
+    log("manual check (record the answer in re/gp150/DEVICE_WRITE.md):")
+    log(f"  a. select preset {display_number(slot):03d} on the pedal's display (internal slot {slot}; Suite "
+        f"numbers presets from 001) and confirm the screen shows {BLANK_NAME!r}; play a few notes: does it sound?")
+    log("  note: §8.2 (does the pedal refresh the active preset on rewrite?) will be a scripted, tested mode "
+        "added in Task 13 — do not improvise it.")
     return results
 
 
@@ -259,7 +327,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         results = run(args.slot)
     except KeyboardInterrupt:
         print(f"interrupted — if a write had started, read slot {args.slot} back before retrying: "
-              f"{READ_CMD.format(slot=args.slot)}")
+              f"{READ_CMD.format(slot=args.slot)}; power-cycle the pedal if hello gets no answer; "
+              "do not flip the gate")
         return 130
     return 0 if len(results) == len(STEPS) and all(ok for _label, ok, _detail in results) else 1
 

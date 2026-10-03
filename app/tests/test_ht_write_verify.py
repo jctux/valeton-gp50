@@ -7,6 +7,8 @@ fails any use of mido, and once a test's own fake-port Session exists,
 ht_scan.Session is replaced by a tripwire, so the script can only use the ONE
 session it was handed (a second session on the port would double-ACK the 0x08).
 WRITE_VERIFIED["gp150"] is never touched: the script passes allow_unverified=True.
+Backups go to a per-test tmp dir, never the repo's device_scan_gp150/. Step 2's
+hardware timings (3 s / 2 s) are scaled down here and pinned separately.
 Python 3.9-compatible (also run under .venv-midi).
 """
 from __future__ import annotations
@@ -39,11 +41,25 @@ def evidence(name):
 
 
 ACTIVE_PRST = evidence("100-active.prst")  # the pedal's active preset (index 100)
+REAL_STEP2 = (hwv.EMPTY_PROOF_TIMEOUT, hwv.LATE_STREAM_PUMP)  # read at import, before any fixture
 
 
 @pytest.fixture(autouse=True)
 def _no_mido(monkeypatch):
     monkeypatch.setitem(sys.modules, "mido", _BlockedMido("mido"))
+
+
+@pytest.fixture(autouse=True)
+def _fast_step2(monkeypatch):
+    monkeypatch.setattr(hwv, "EMPTY_PROOF_TIMEOUT", OPTS["empty_timeout"])
+    monkeypatch.setattr(hwv, "LATE_STREAM_PUMP", 0.05)
+
+
+@pytest.fixture(autouse=True)
+def backup_dir(monkeypatch, tmp_path):
+    d = str(tmp_path / "write_verify_backup")
+    monkeypatch.setattr(hwv, "BACKUP_DIR", d)
+    return d
 
 
 def import_done(tx):
@@ -66,10 +82,16 @@ class WritePedal(FakePedal):
     (passed through `store`, default: exactly as received, 0x0A = 0x5C), ACKs the
     transfer id and sends a 0x08 'import done' with its own tx id (0x0D, 0x0E, …).
     Later reads of that slot return the stored bytes. Knobs: ack_import, notify,
-    store(prst) -> bytes, import_sets_active (the pedal also loads the import)."""
+    store(prst) -> bytes, import_sets_active (the pedal also loads the import),
+    script={slot: [how, ...]}: the next reads of that slot, one `how` each —
+    "drop" (no ACK, no stream: a lost request), "empty" (ACK, then silence),
+    "corrupt" (ACK, then the slot's stream with every outer CRC broken),
+    ("late", s) (ACK, then the slot's stream s seconds later); then the default."""
 
-    def __init__(self, presets=None, ack_import=True, notify=True, store=None, import_sets_active=False, **kw):
+    def __init__(self, presets=None, ack_import=True, notify=True, store=None, import_sets_active=False,
+                 script=None, **kw):
         super().__init__(presets={0: None, ACTIVE: ACTIVE_PRST} if presets is None else presets, **kw)
+        self.script = {k: list(v) for k, v in (script or {}).items()}
         self.ack_import, self.notify = ack_import, notify
         self.store = store or (lambda prst: prst)
         self.import_sets_active = import_sets_active
@@ -77,9 +99,35 @@ class WritePedal(FakePedal):
         self.imports = []  # every imported .prst, as received
         self.notify_tx = []  # tx id of every 0x08 sent
 
+    def scripted_read(self, wire, f):
+        if self.dead or f.family != ht.FAMILY_PRESET_REQ:
+            return False
+        p = ht.parse_logical(ht.dec(f.body[1:]))
+        slot = p[8] | (p[9] << 8)
+        if not self.script.get(slot):
+            return False
+        how = self.script[slot].pop(0)
+        self.sent.append(wire)
+        self.sent_at_poll.append(self.polls)
+        self.reads += 1
+        if how == "drop":
+            return True
+        self.emit(ht.ack(f.tx4[3]))
+        if how == "corrupt":
+            for i, c in enumerate(self.stream_for(slot)):
+                b = bytearray(c)
+                b[2] ^= 0x01  # outer CRC wrong: the session drops (and counts) the frame
+                self.emit(bytes(b), 0.003 + i * 0.001)
+        elif how != "empty":
+            _late, delay = how
+            self.stream(self.stream_for(slot), delay=delay)
+        return True
+
     def receive(self, wire):
-        super().receive(wire)  # logs the frame; hello / reads / host ACKs
         f = ht.parse_frame(wire)
+        if self.scripted_read(wire, f):
+            return
+        super().receive(wire)  # logs the frame; hello / reads / host ACKs
         if self.dead or f.family != ht.FAMILY_PATCH or not ht.is_chunk(f):
             return
         self.chunks.append(f)
@@ -145,12 +193,24 @@ def step_lines(lines):
     return [ln for ln in lines if ln[:1].isdigit()]
 
 
-READS_BEFORE_WRITE = ["hello", "read 65535", "ack 0x21", "read 199", "read 0", "ack 0x0c"]
+READS_BEFORE_WRITE = ["hello", "read 65535", "ack 0x21", "read 199", "read 199", "read 0", "ack 0x0c"]
+DISPLAY_CHECK = ("select preset 200 on the pedal's display (internal slot 199; Suite numbers presets from 001) "
+                 "and confirm the screen shows 'New GEN.'")
+
+
+def user_preset(index=SLOT):
+    b = bytearray(evidence("099-Finger_AC.prst"))
+    b[f150.IDX_OFF] = index
+    return bytes(b)
+
+
+def no_write(p):
+    return p.imports == [] and not any(w[3] == ht.FAMILY_PATCH for w in p.sent)
 
 
 # --- the whole protocol --------------------------------------------------------------
 
-def test_all_six_steps_pass_with_exactly_one_ack_per_0x08(monkeypatch, midi_port_guard):
+def test_all_six_steps_pass_with_exactly_one_ack_per_0x08(monkeypatch, midi_port_guard, backup_dir):
     p = WritePedal()
     calls = []
     real_send = dw.send_stream
@@ -195,29 +255,138 @@ def test_all_six_steps_pass_with_exactly_one_ack_per_0x08(monkeypatch, midi_port
         assert k["confirm"] is True and k["validated"] is True and k["allow_unverified"] is True
     assert dw.WRITE_VERIFIED["gp150"] is False
 
+    # backed up before the first write: the active preset + exactly what went to 199
+    sent = bytearray(want)
+    sent[0x0A] = CORPUS_PRST[0x0A]  # the import marker is set by the builder, not in the file
+    files = {n: open(os.path.join(backup_dir, n), "rb").read() for n in os.listdir(backup_dir)}
+    assert files == {"100-It_s_GP_150.prst": ACTIVE_PRST, "199-WRITE_TEST.prst": bytes(sent)}
+    backups = [ln for ln in lines if ln.startswith("  backup: ")]
+    assert backups == [f"  backup: active preset -> {os.path.join(backup_dir, '100-It_s_GP_150.prst')}",
+                       f"  backup: write-test preset (for slot 199) -> {os.path.join(backup_dir, '199-WRITE_TEST.prst')}"]
+    assert lines.index(backups[-1]) < lines.index(step_lines(lines)[2])  # before step 3's write
+
+    # step 2's proof left the session as it found it
+    assert s.empty_timeout == OPTS["empty_timeout"] and s.log is ht_scan._default_log
+
     # what the user records
-    assert "empty-acked" in results[1][2]
+    assert "read empty twice (last_status=empty-acked, empty-acked" in results[1][2]
     assert "back[0x0A] = 0x5c" in results[3][2]
     assert "ignored differences: 0x00a" in results[3][2]  # 0x5C stored vs the export's 0x58
     assert "New GEN." in results[4][2]
     text = "\n".join(lines)
-    assert "select slot 199 on the pedal" in text and "8.2" in text
+    assert DISPLAY_CHECK in text
+    assert "will be a scripted, tested mode added in Task 13 — do not improvise it" in text
     assert midi_port_guard == []
 
 
-def test_an_occupied_slot_fails_step_2_and_nothing_is_sent_after_it(monkeypatch, midi_port_guard):
-    user = bytearray(evidence("099-Finger_AC.prst"))
-    user[f150.IDX_OFF] = SLOT
-    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: bytes(user)})
+def test_an_occupied_slot_fails_step_2_and_nothing_is_sent_after_it(monkeypatch, midi_port_guard, backup_dir):
+    user = user_preset()
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user})
     results, lines, _s = run_on(p, monkeypatch)
     assert oks(results) == [True, False], "\n".join(lines)
     detail = results[1][2]
-    assert f150.read_name(bytes(user)) in detail and "refus" in detail and "last_status=preset" in detail
+    assert f150.read_name(user) in detail and "refus" in detail and "last_status=preset" in detail
     assert HINT not in detail  # nothing was written: no read-back needed
     assert wire_log(p) == ["hello", "read 65535", "ack 0x21", "read 199", "ack 0x21"]  # then nothing at all
-    assert p.imports == [] and not any(w[3] == ht.FAMILY_PATCH for w in p.sent)
-    assert p.presets[SLOT] == bytes(user)
+    assert no_write(p) and p.presets[SLOT] == user
     assert step_lines(lines)[-1].startswith("2 FAIL")
+    assert not os.path.exists(backup_dir)  # backups come right before the first write only
+    assert midi_port_guard == []
+
+
+# --- step 2: a None read is not proof (fix round 1) ---------------------------------
+
+@pytest.mark.parametrize("settle, late_pump, where", [
+    (0.08, 0.05, "the read's own settle"),  # the reviewer's case: chunks ACKed + discarded while settling
+    (0.005, 0.3, "the trailing watch"),  # chunks that come even later
+])
+def test_a_late_stream_fails_step_2_scenario_a(monkeypatch, midi_port_guard, settle, late_pump, where):
+    # ACK, then the full slot's stream 0.09 s later, past the (scaled) 0.06 s empty timeout:
+    # read() returns None with last_status=empty-acked, the session discards the chunks
+    monkeypatch.setattr(hwv, "LATE_STREAM_PUMP", late_pump)
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user_preset()}, script={SLOT: [("late", 0.09)]})
+    results, lines, s = run_on(p, monkeypatch, settle=settle)
+    assert oks(results) == [True, False], where + "\n" + "\n".join(lines)
+    assert "arrived late" in results[1][2] and "probably NOT empty" in results[1][2]
+    assert no_write(p), where
+    assert wire_log(p) == ["hello", "read 65535", "ack 0x21", "read 199", "ack 0x21"]  # the ACK = session duty
+    assert s.empty_timeout == OPTS["empty_timeout"]  # restored after the proof
+    assert s.log is ht_scan._default_log
+    assert midi_port_guard == []
+
+
+def test_the_long_empty_timeout_reads_a_slow_stream_as_a_preset(monkeypatch, midi_port_guard):
+    monkeypatch.setattr(hwv, "EMPTY_PROOF_TIMEOUT", 0.3)  # >= the stream's delay: the read waits for it
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user_preset()}, script={SLOT: [("late", 0.09)]})
+    results, lines, s = run_on(p, monkeypatch)
+    assert oks(results) == [True, False], "\n".join(lines)
+    assert "holds a preset" in results[1][2]
+    assert no_write(p) and s.empty_timeout == OPTS["empty_timeout"]
+    assert midi_port_guard == []
+
+
+def test_lost_requests_fail_step_2_scenario_b(monkeypatch, midi_port_guard):
+    # the first two requests for the (full) slot are lost; the hello probe is answered:
+    # read() returns None with last_status=empty-unacked — no override exists
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user_preset()}, script={SLOT: ["drop", "drop"]})
+    results, lines, _s = run_on(p, monkeypatch)
+    assert oks(results) == [True, False], "\n".join(lines)
+    assert results[1][2].endswith("slot 199 gave no ACK — cannot distinguish empty from lost request; "
+                                  "answer DEVICE_READ question (a) with a full scan first")
+    assert no_write(p)
+    assert wire_log(p) == ["hello", "read 65535", "ack 0x21", "read 199", "read 199", "hello"]
+    assert midi_port_guard == []
+
+
+def test_the_second_read_must_confirm_the_first(monkeypatch, midi_port_guard):
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user_preset()}, script={SLOT: ["empty"]})
+    results, lines, _s = run_on(p, monkeypatch)
+    assert oks(results) == [True, False], "\n".join(lines)
+    assert results[1][2].startswith("read 2: slot 199 holds a preset")
+    assert no_write(p)
+    assert wire_log(p) == ["hello", "read 65535", "ack 0x21", "read 199", "read 199", "ack 0x21"]
+    assert midi_port_guard == []
+
+
+def test_corrupt_frames_during_the_empty_check_fail_step_2(monkeypatch, midi_port_guard):
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: user_preset()}, script={SLOT: ["corrupt"]})
+    results, lines, _s = run_on(p, monkeypatch)
+    assert oks(results) == [True, False], "\n".join(lines)
+    assert "corrupt frame" in results[1][2] and "cannot prove slot 199 empty" in results[1][2]
+    assert no_write(p)
+    assert midi_port_guard == []
+
+
+def test_step_2_timings_on_hardware_and_the_late_chunk_log_line(monkeypatch):
+    assert REAL_STEP2[0] >= 3.0 and REAL_STEP2[1] >= 2.0
+    # the tap matches exactly what Session.pump logs for a discarded preset chunk
+    p = WritePedal()
+    seen = []
+    s = ht_scan.Session(p.inp, p.out, to_message=FakeMsg, log=lambda lvl, msg: seen.append(msg), **OPTS)
+    p.stream(None)
+    s.pump(0.05)
+    assert seen and all(hwv.LATE_CHUNK_LOG in m for m in seen)
+
+
+def test_the_active_slot_is_refused_at_step_1(monkeypatch, midi_port_guard):
+    p = WritePedal(presets={0: None, ACTIVE: user_preset(SLOT)})
+    results, lines, _s = run_on(p, monkeypatch)
+    assert oks(results) == [False], "\n".join(lines)
+    assert "the active preset is slot 199" in results[0][2]
+    assert wire_log(p) == ["hello", "read 65535", "ack 0x21"] and no_write(p)
+    assert midi_port_guard == []
+
+
+def test_a_failed_backup_fails_step_3_before_anything_is_sent(monkeypatch, midi_port_guard, tmp_path):
+    blocker = tmp_path / "not_a_dir"
+    blocker.write_bytes(b"")
+    monkeypatch.setattr(hwv, "BACKUP_DIR", str(blocker / "write_verify_backup"))
+    p = WritePedal()
+    results, lines, _s = run_on(p, monkeypatch)
+    assert oks(results) == [True, True, False], "\n".join(lines)
+    assert "could not save the backups" in results[2][2] and "nothing was sent" in results[2][2]
+    assert results[2][2].endswith(HINT)
+    assert no_write(p) and wire_log(p) == READS_BEFORE_WRITE
     assert midi_port_guard == []
 
 
@@ -274,7 +443,7 @@ def test_a_changed_active_preset_fails_step_6(monkeypatch, midi_port_guard):
     results, lines, _s = run_on(p, monkeypatch)
     assert oks(results) == [True] * 5 + [False], "\n".join(lines)
     assert "changed" in results[5][2] and results[5][2].endswith(HINT)
-    assert "select slot 199 on the pedal" not in "\n".join(lines)  # no manual checks after a FAIL
+    assert "select preset 200" not in "\n".join(lines)  # no manual check after a FAIL
     assert midi_port_guard == []
 
 
@@ -301,6 +470,7 @@ def test_same_except_ignores_only_0x0a_and_0x0d_to_0x0f():
 
 
 def test_slot_is_checked_before_any_port_is_opened(midi_port_guard):
+    assert (hwv.display_number(0), hwv.display_number(199)) == (1, 200)  # the pedal/Suite count from 001
     for bad in (0, -1, 200, ACTIVE, "199", None):  # 0 is the source preset's slot
         with pytest.raises(ValueError):
             hwv.run(bad)
