@@ -130,13 +130,29 @@ def _norm(s: str) -> str:
     return "".join(ch for ch in (s or "").lower() if ch.isalnum())
 
 
-def _param_from_spec(p: dict) -> dict:
-    rng = p.get("range") or ""
-    nums = [float(x) for x in re.findall(r"-?\d+(?:\.\d+)?", rng.replace("–", "-"))]
+_NUM = r"[+-]?\d+(?:\.\d+)?"
+_RANGE2 = re.compile(r"^\s*(" + _NUM + r")\s*[\u2013-]\s*(" + _NUM + r")")
+_RANGE1 = re.compile(r"^\s*(" + _NUM + r")\s*$")
+
+
+def _param_from_spec(p: dict, effect: str = "?") -> dict:
+    rng = (p.get("range") or "").replace("\u2212", "-")
     toggle = rng.lower() in ("off/on", "on/off", "0/1")
+    lo, hi = 0.0, 100.0
+    if toggle:
+        hi = 1.0
+    else:
+        m = _RANGE2.match(rng)
+        if m:
+            lo, hi = float(m.group(1)), float(m.group(2))
+        else:
+            m = _RANGE1.match(rng)
+            if m:
+                lo = hi = float(m.group(1))
+            else:
+                print(f"warn: unparseable range {rng!r} for {effect}.{p['name']}; using 0-100")
     return {"name": p["name"], "algId": p["index"], "toggle": toggle, "unit": p.get("unit") or "",
-            "min": nums[0] if nums else 0.0, "max": nums[1] if len(nums) > 1 else (1.0 if toggle else 100.0),
-            "step": 1.0, "default": 0.0}
+            "min": lo, "max": hi, "step": 1.0, "default": 0.0}
 
 
 def build_ring_gp150() -> dict:
@@ -157,7 +173,7 @@ def build_ring_gp150() -> dict:
         for type_s, spec in tmap.get(slot, {}).items():
             key = (slot_idx << 24) | int(type_s)
             suite_e = by_mod.get(slot, {}).get(_norm(spec["name"]))
-            params = [_param_from_spec(p) for p in spec["params"]]
+            params = [_param_from_spec(p, spec["name"]) for p in spec["params"]]
             if suite_e:
                 by_name = {_norm(p["name"]): p for p in params_of(suite_e)}
                 for p in params:

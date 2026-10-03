@@ -51,3 +51,24 @@ def test_corpus_blocks_resolve_or_fall_back_to_type_label():
             hits += str(f150.model_key(slot, type_)) in RING
     assert seen == 12 * len(files)
     assert hits >= seen * 0.7  # spec is incomplete for some slots; UI shows "Type N" for the rest
+
+
+def test_param_bounds_are_ordered():
+    for k, e in RING.items():
+        for p in e["params"]:
+            assert p["min"] <= p["max"], (k, e["name"], p)
+
+
+def test_param_from_spec_range_parsing():
+    from patch import build_ring
+
+    def mm(r):
+        q = build_ring._param_from_spec({"name": "X", "index": 0, "range": r, "unit": ""})
+        return (q["min"], q["max"]), q["toggle"]
+
+    assert mm("0–100") == ((0, 100), False)
+    assert mm("−15–+20") == ((-15, 20), False)
+    assert mm("-12–+12") == ((-12, 12), False)
+    assert mm("0.10–10.00") == ((0.1, 10.0), False)
+    assert mm("200–200") == ((200, 200), False)
+    assert mm("Off/On") == ((0, 1), True)
