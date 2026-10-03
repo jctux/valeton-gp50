@@ -47,8 +47,9 @@ device profile.
 
 - **Scan and browse all 200 preset slots**: name, the **12-block** chain (NR, PRE, WAH,
   DST, N→S, AMP, CAB, EQ, MOD, DLY, RVB, VOL) in its stored order, models and parameters.
-  A slot that stays silent is shown as empty. The GP-150 has no known bulk name read,
-  so a scan reads one slot at a time and is slower than a GP-50 scan.
+  A slot that stays silent is listed with no name (stored locally as the factory
+  "New GEN." blank). A scan reads all 200 slots one by one and waits about 1.5 s on
+  each empty slot, so expect it to take longer than a GP-50 scan.
 - **AMP is locked first.** The pedal keeps AMP at chain position 0. The chain view pins
   it there, and the codec refuses any block order that doesn't start with AMP.
 - **Back up / export**: **⬇ Download edited .prst** with no edits saves the preset as
@@ -74,10 +75,11 @@ device profile.
 **Using it:** Chrome or Edge, GP-150 on **USB** (Bluetooth isn't supported). **Close
 Valeton Suite if the handshake fails**: it holds the MIDI port. If it still fails,
 unplug and replug the USB cable. The GP-150 path runs in the backend-free static mode,
-so use the static build (`node scripts/build_static_data.mjs && node
-scripts/build_static_site.mjs`, then serve `dist/`) or, on the local server, open
+so use the static build (`node scripts/build_static_site.mjs`, then serve `dist/`;
+the GP-150 catalog is already in `app/static/data/`) or, on the local server, open
 `http://127.0.0.1:8756/explorer?static=1`. The FastAPI backend's device routes are
-GP-5/GP-50 only. Then click **Scan device**. The Chrome 152 known issue under
+GP-5/GP-50 only. Then click **⟳ Scan device** (or **⟳ Rescan device** when a
+preset list is already shown). The Chrome 152 known issue under
 [Run](#run) is a Web MIDI SysEx bug, so expect it to hit the GP-150 too.
 
 **How it was reverse-engineered:** the GP-150 ignores the GP-5/GP-50 requests and the

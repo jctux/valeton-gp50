@@ -27,7 +27,7 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
   position 0**: the codec refuses any order that doesn't start with it. A block names
   its model by `(slot, type)`, where type is a per-slot enumeration (not an fxid low
   byte). The ring `patch/fxid_ring_gp150.json` is keyed **`(slot << 24) | type`**;
-  an engine-0x06 block is the "None" effect. **Read-only**:
+  an engine-0x06 block other than VOL is the "None" effect (VOL's normal engine is 0x06). **Read-only**:
   `WRITE_VERIFIED["gp150"] = False` until the import stream is verified on
   hardware. No conversion to or from the GP-5/GP-50.
 - **Patch** — one device preset slot (index 0–99; 0–199 on the GP-150). Serialized
