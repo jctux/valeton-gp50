@@ -15,7 +15,18 @@
 
   let patches = [];
   let facets = { blocks: [] };
-  let inventoryDevice = null; // {key,name} the loaded presets belong to
+  let inventoryDevice = null; // {key,name,slots} the loaded presets belong to
+  // Slot count and codec layout of the loaded presets' device. GP-5/GP-50: 100
+  // slots, 10-block chain around a fixed core; GP-150: 200 slots, 12 blocks, AMP
+  // locked at chain position 0 (PRST.codecFor(key).layout).
+  const slotCount = () => {
+    const d = inventoryDevice, prof = d && window.PRST && window.PRST.DEVICES && window.PRST.DEVICES[d.key];
+    return (d && d.slots) || (prof && prof.slots) || 100;
+  };
+  const layoutOf = () => window.PRST.codecFor((inventoryDevice && inventoryDevice.key) || "gp50").layout;
+  const scanDuration = (n = slotCount()) => (n > 100 ? "about 2 minutes" : "about 90 seconds");
+  // what "Clear preset" writes: the codec's blank (GP-150: factory "New GEN." with the slot's index)
+  const blankLabel = () => ((inventoryDevice && inventoryDevice.key) === "gp150" ? 'the factory "New GEN." preset' : 'a blank "GP-50" preset');
   let filters = []; // {block, type|null, model|null}
 
   // N->S is the pedal's block name for the SnapTone slot; label it plainly.
@@ -243,7 +254,8 @@
   function curOrder(p) {
     const e = edits.get(p.slot);
     if (e && e.order != null) return e.order;
-    return (p.order && p.order.length === 10) ? p.order : Array.from({ length: 10 }, (_, i) => i);
+    const n = layoutOf().N_BLOCKS;
+    return (p.order && p.order.length === n) ? p.order : Array.from({ length: n }, (_, i) => i);
   }
 
   // Effective block view: if the user swapped the model, render the NEW model's
@@ -536,7 +548,7 @@
     if (window.DeviceBridge && DeviceBridge.webmidiAvailable()) {
       const clr = document.createElement("button");
       clr.type = "button"; clr.className = "clear-preset"; clr.textContent = "🗑 Clear preset";
-      clr.title = `Overwrite slot ${p.slot} with a blank "GP-50" preset (writes the pedal)`;
+      clr.title = `Overwrite slot ${p.slot} with ${blankLabel()} (writes the pedal)`;
       clr.addEventListener("click", () => clearPreset(p));
       bar.appendChild(clr);
     }
@@ -551,14 +563,15 @@
       UI.toast("Clear needs Chrome or Edge (WebMIDI).", "err");
       return;
     }
+    const key = (inventoryDevice && inventoryDevice.key) || "gp50";
     const ok = await UI.confirmDialog(
-      `Clear slot ${p.slot} "${curName(p)}" back to a blank "GP-50" preset? This overwrites the slot on the pedal and can't be undone from here. Make sure Valeton Suite is closed.`,
+      `Clear slot ${p.slot} "${curName(p)}" back to ${blankLabel()}? This overwrites the slot on the pedal and can't be undone from here. Make sure Valeton Suite is closed.`,
       "Clear preset");
     if (!ok) return;
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
     try {
       if (!DeviceBridge.connected()) { if (note) note.textContent = "Connecting to pedal…"; await DeviceBridge.connect(); }
-      const blank = window.PRST.blankPrst((inventoryDevice && inventoryDevice.key) || "gp50");
+      const blank = window.PRST.codecFor(key).blankPrst(key === "gp150" ? p.slot : key);
       if (note) note.textContent = `Clearing slot ${p.slot}…`;
       await withTimeout(
         DeviceBridge.writeSlot(p.slot, blank), 15000,
@@ -598,11 +611,27 @@
     wrap.className = "chain-strip-wrap";
     const lbl = document.createElement("div");
     lbl.className = "chain-strip-label";
-    lbl.innerHTML = `Signal chain <span class="hint">— drag NR · PRE · MOD · DLY · RVB around the fixed amp core</span>`;
+    const L = layoutOf();
+    lbl.innerHTML = L.lockedFirst
+      ? `Signal chain <span class="hint">— AMP stays first; drag the other blocks</span>`
+      : `Signal chain <span class="hint">— drag NR · PRE · MOD · DLY · RVB around the fixed amp core</span>`;
     wrap.appendChild(lbl);
     const strip = document.createElement("div");
     strip.className = "chain-strip";
     const order = curOrder(p);
+    if (L.lockedFirst) {
+      // GP-150: AMP is pinned at chain position 0; every other block moves freely after it
+      const core = document.createElement("div");
+      core.className = "chain-core";
+      core.title = "AMP must stay at position 0";
+      const first = order[0];
+      if (p.blocks[first]) core.appendChild(chainChip(p, p.blocks[first], first, true));
+      strip.appendChild(core);
+      order.slice(1).forEach((recIdx) => { const b = p.blocks[recIdx]; if (b) strip.appendChild(chainChip(p, b, recIdx, false)); });
+      wireChainDrag(p, strip);
+      wrap.appendChild(strip);
+      return wrap;
+    }
     let coreDone = false;
     order.forEach((recIdx) => {
       const b = p.blocks[recIdx];
@@ -649,9 +678,11 @@
   }
 
   function setChainOrder(p, order) {
-    if (order.length !== 10 || new Set(order).size !== 10) return; // guard: keep it a permutation
+    const L = layoutOf(), n = L.N_BLOCKS;
+    if (order.length !== n || new Set(order).size !== n) return; // guard: keep it a permutation
+    if (L.lockedFirst && order[0] !== L.AMP_INDEX) return; // GP-150: AMP must stay at position 0
     const e = getEdit(p.slot);
-    const base = (p.order && p.order.length === 10) ? p.order : Array.from({ length: 10 }, (_, i) => i);
+    const base = (p.order && p.order.length === n) ? p.order : Array.from({ length: n }, (_, i) => i);
     e.order = order.every((v, i) => v === base[i]) ? null : order;
     refreshSaveBar(p);
     renderPresets(); // re-render so the strip + block cards reflect the new chain order
@@ -671,7 +702,9 @@
       if (!dragging) return;
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
-      const after = chainDragAfter(strip, ev.clientX);
+      let after = chainDragAfter(strip, ev.clientX);
+      // locked-first layout (GP-150): nothing may land before the AMP core
+      if (after && after.classList.contains("chain-core") && layoutOf().lockedFirst) after = after.nextElementSibling;
       if (after == null) strip.appendChild(dragging);
       else strip.insertBefore(dragging, after);
     });
@@ -805,34 +838,37 @@
       });
       head.appendChild(sw);
 
-      // FS1 / FS2 assignment toggles (max 2 blocks per footswitch)
-      const fs = curFS(p);
-      ["fs1", "fs2"].forEach((fsKey) => {
-        const on = fs[fsKey].includes(blkIdx);
-        const full = fs[fsKey].length >= 2 && !on;
-        const fb = document.createElement("button");
-        fb.type = "button";
-        fb.className = "fs-toggle" + (on ? " on" : "") + (full ? " full" : "");
-        fb.textContent = fsKey.toUpperCase();
-        fb.setAttribute("aria-pressed", on ? "true" : "false");
-        fb.title = on
-          ? `Remove this block from ${fsKey.toUpperCase()}`
-          : full
-            ? `${fsKey.toUpperCase()} already has its 2 blocks (device max)`
-            : `Assign this block to ${fsKey.toUpperCase()}`;
-        // always handle the click so it never falls through to the row toggle;
-        // a full FS just warns instead of assigning (was: disabled + pointer-events
-        // none let the click hit the header and collapse/expand the row).
-        fb.addEventListener("click", (ev) => {
-          ev.stopPropagation();
-          if (full) {
-            UI.toast(`${fsKey.toUpperCase()} already has its 2 blocks.`, "err");
-            return;
-          }
-          toggleFS(p, blkIdx, fsKey);
+      // FS1 / FS2 assignment toggles (max 2 blocks per footswitch); the GP-150's
+      // .prst has no FS assignment record (layout.hasFootswitches false)
+      if (layoutOf().hasFootswitches) {
+        const fs = curFS(p);
+        ["fs1", "fs2"].forEach((fsKey) => {
+          const on = fs[fsKey].includes(blkIdx);
+          const full = fs[fsKey].length >= 2 && !on;
+          const fb = document.createElement("button");
+          fb.type = "button";
+          fb.className = "fs-toggle" + (on ? " on" : "") + (full ? " full" : "");
+          fb.textContent = fsKey.toUpperCase();
+          fb.setAttribute("aria-pressed", on ? "true" : "false");
+          fb.title = on
+            ? `Remove this block from ${fsKey.toUpperCase()}`
+            : full
+              ? `${fsKey.toUpperCase()} already has its 2 blocks (device max)`
+              : `Assign this block to ${fsKey.toUpperCase()}`;
+          // always handle the click so it never falls through to the row toggle;
+          // a full FS just warns instead of assigning (was: disabled + pointer-events
+          // none let the click hit the header and collapse/expand the row).
+          fb.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            if (full) {
+              UI.toast(`${fsKey.toUpperCase()} already has its 2 blocks.`, "err");
+              return;
+            }
+            toggleFS(p, blkIdx, fsKey);
+          });
+          head.appendChild(fb);
         });
-        head.appendChild(fb);
-      });
+      }
       bd.appendChild(head);
 
       if (pickerKey === `${p.slot}:${blkIdx}`) bd.appendChild(buildPicker(p, blkIdx, b));
@@ -1006,13 +1042,13 @@
     const e = getEdit(p.slot);
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
     const ans = await UI.promptDialog(
-      `Write "${p.name}" directly to the pedal. Enter the target slot (0–99) to OVERWRITE. Make sure Valeton Suite is closed.`,
+      `Write "${p.name}" directly to the pedal. Enter the target slot (0–${slotCount() - 1}) to OVERWRITE. Make sure Valeton Suite is closed.`,
       String(p.slot), "Next"
     );
     if (ans === null) return;
     const target = Number(ans);
-    if (!Number.isInteger(target) || target < 0 || target > 99) {
-      if (note) note.textContent = "Write cancelled: slot must be 0–99.";
+    if (!Number.isInteger(target) || target < 0 || target > slotCount() - 1) {
+      if (note) note.textContent = `Write cancelled: slot must be 0–${slotCount() - 1}.`;
       return;
     }
     if (!(await UI.confirmDialog(`Overwrite device slot ${target} with "${p.name}"? This writes to the pedal.`, "Overwrite"))) return;
@@ -1243,9 +1279,10 @@
   function reorderBlockReason() {
     if (!(window.DeviceBridge && DeviceBridge.webmidiAvailable())) return "Reorder needs Chrome or Edge (WebMIDI).";
     if (!window.__staticApi || !window.__staticApi.getAllSlotBytes) return "Reorder needs the static WebMIDI app.";
-    if (filters.length || searchEl.value.trim()) return "Clear the search and filters first — reordering needs all 100 slots visible.";
+    if (filters.length || searchEl.value.trim()) return `Clear the search and filters first — reordering needs all ${slotCount()} slots visible.`;
     const slots = patches.map((p) => p.slot).sort((a, z) => a - z);
-    if (slots.length !== 100 || slots[0] !== 0 || slots[99] !== 99) return "Reorder needs the full 100-preset inventory — rescan the device.";
+    const n = slotCount();
+    if (slots.length !== n || slots[0] !== 0 || slots[n - 1] !== n - 1) return `Reorder needs the full ${n}-preset inventory — rescan the device.`;
     if (liveSlot != null) return "Finish the live edit first (keep or restore it), then reorder.";
     return null;
   }
@@ -1318,12 +1355,14 @@
 
     const all = window.__staticApi.getAllSlotBytes();
     const slots = all ? Object.keys(all).map(Number).sort((a, z) => a - z) : [];
-    if (slots.length !== 100 || slots[0] !== 0 || slots[99] !== 99) {
+    const n = slotCount();
+    if (slots.length !== n || slots[0] !== 0 || slots[n - 1] !== n - 1) {
       UI.toast("Snapshot is incomplete — take a fresh snapshot and try again.", "err");
       return false;
     }
     reorderSnapshot = { bytes: all, names: {}, takenAt: Date.now() };
-    for (const slot of slots) reorderSnapshot.names[slot] = window.PRST.readName(all[slot]);
+    const codec = window.PRST.codecFor((inventoryDevice && inventoryDevice.key) || "gp50");
+    for (const slot of slots) reorderSnapshot.names[slot] = codec.readName(all[slot]);
     return true;
   }
 
@@ -1340,8 +1379,8 @@
           <h2 style="margin:0 0 .6rem">Reorder presets</h2>
           <p class="modal-msg" style="margin:0 0 1.2rem">
             Preset reordering is fully supported. First we take a clean snapshot of all
-            100 presets so every one moves with its current settings. It reads one preset
-            at a time and takes about 90 seconds. Don't refresh or close this tab during
+            ${slotCount()} presets so every one moves with its current settings. It reads one preset
+            at a time and takes ${scanDuration()}. Don't refresh or close this tab during
             the snapshot, or you'll lose progress and have to start over.
           </p>
           <div class="modal-actions" style="justify-content:flex-end;gap:.6rem">
@@ -1470,7 +1509,7 @@
     a.href = url; a.download = `${(inventoryDevice && inventoryDevice.key) || "gp50"}_bank_backup.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
-    UI.toast("Saved a bank backup (all 100 presets).", "ok");
+    UI.toast(`Saved a bank backup (all ${slotCount()} presets).`, "ok");
   }
 
   async function finalizeInlineReorder() {
@@ -1917,8 +1956,16 @@
 
   const scanButtons = () => [$("scan-btn"), $("scan-btn-hero")].filter(Boolean);
 
+  // A scan reads the CONNECTED pedal, whose presets may not be loaded yet (first
+  // GP-150 scan while the page still shows the bundled GP-50 set).
+  const scanSlotCount = () => {
+    const d = deviceLive.device, prof = d && window.PRST && window.PRST.DEVICES && window.PRST.DEVICES[d.key];
+    return (prof && prof.slots) || slotCount();
+  };
+
   async function startScan() {
-    if (!(await UI.confirmDialog("Begin scan of all 100 presets?\n\nPlease ensure your device is connected to your computer via USB cable. This takes about 90 seconds — don't refresh or close this tab, or you'll lose progress and have to start over.", "Begin scan"))) return;
+    const n = scanSlotCount();
+    if (!(await UI.confirmDialog(`Begin scan of all ${n} presets?\n\nPlease ensure your device is connected to your computer via USB cable. This takes ${scanDuration(n)} — don't refresh or close this tab, or you'll lose progress and have to start over.`, "Begin scan"))) return;
     scanButtons().forEach((b) => (b.disabled = true));
     $("scan-progress").hidden = false;
     $("scan-fill").style.width = "0%";
