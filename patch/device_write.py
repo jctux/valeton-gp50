@@ -144,6 +144,8 @@ def validate_gp150_stream(packets, slot: Optional[int] = None) -> Tuple[bool, st
             offset, t, idx, _piece = ht.chunk_fields(f)
         except ValueError as e:
             return False, f"packet {i}: {e}"
+        if t < 1:
+            return False, f"packet {i}: transfer id 0 (must be 1..0x7F)"
         if tid is None:
             tid = t
         elif t != tid:
@@ -176,6 +178,11 @@ def validate_gp150_stream(packets, slot: Optional[int] = None) -> Tuple[bool, st
     if slot is not None and index != slot:
         return False, f"preset index byte {index} != target slot {slot}"
     return True, "ok"
+
+
+def _read_back(slot: int) -> str:
+    """The hint on every error that leaves the slot's state unknown."""
+    return f"read slot {slot} back before retrying: it may or may not have been written"
 
 
 def _is_import_done(f) -> bool:
@@ -211,28 +218,29 @@ def _send_gp150_stream(port_name, packets, allow_unverified, session, pace, noti
         if session is None:
             s.close()
     if r.error is not None:
-        raise RuntimeError(f"GP-150 import to slot {slot} failed while sending: {r.error}")
+        raise RuntimeError(f"GP-150 import to slot {slot} failed while sending ({r.error}) — {_read_back(slot)}")
     if any(_is_import_done(f) for f in r.frames[:r.before_last]):
         s.log("warn", "a 0x08 notification arrived before the import was complete (ignored)")
     notes = [f for f in r.frames[r.before_last:] if _is_import_done(f)]  # answers to the whole stream only
     if not notes:
         if not r.ack:
             raise RuntimeError(
-                f"GP-150 did not ACK the import to slot {slot} ({ht_scan.NOT_RESPONDING}). "
-                f"Read slot {slot} back before retrying: it may or may not have been written."
+                f"GP-150 did not ACK the import to slot {slot} ({ht_scan.NOT_RESPONDING}) — {_read_back(slot)}"
             )
         raise RuntimeError(
             f"GP-150 ACKed the import to slot {slot} but sent no 0x08 'import done' within "
-            f"{notify_timeout:g} s — read slot {slot} back before trusting or retrying the write."
+            f"{notify_timeout:g} s — {_read_back(slot)}"
         )
     try:
         got = ht.short_payload(notes[0])
     except ValueError as e:
-        raise RuntimeError(f"GP-150 sent an unreadable 0x08 notification after the import ({e})")
+        raise RuntimeError(
+            f"GP-150 sent an unreadable 0x08 notification after the import to slot {slot} ({e}) — {_read_back(slot)}"
+        )
     if got != ht.IMPORT_DONE_PAYLOAD:
         raise RuntimeError(
             f"GP-150 answered the import to slot {slot} with an unexpected 0x08 payload {got.hex()} "
-            f"(Suite capture: {ht.IMPORT_DONE_PAYLOAD.hex()}) — read slot {slot} back."
+            f"(Suite capture: {ht.IMPORT_DONE_PAYLOAD.hex()}) — {_read_back(slot)}"
         )
     return {"sent": len(packets), "acks": 1 if r.ack else 0, "notified": True}
 

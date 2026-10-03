@@ -6,11 +6,16 @@ build_gp150_write_stream(that file, 0) must reproduce every captured wire frame,
 including the 0x0A = 0x5C byte and both CRCs. Sending is exercised only against
 a scripted fake pedal (no MIDI ports): WRITE_VERIFIED["gp150"] stays False until
 Task 12's supervised hardware write, so send_stream refuses without
-allow_unverified=True. Python 3.9-compatible (also run under .venv-midi).
+allow_unverified=True. No test here can reach a real port, whatever the gate
+says: conftest's midi_port_guard fails any call of ht_scan.open_ports, and
+_no_mido below fails any use of mido (the legacy send path's port library).
+Python 3.9-compatible (also run under .venv-midi).
 """
 import json
 import os
+import sys
 import time
+import types
 
 import pytest
 
@@ -25,6 +30,20 @@ MSG = {m["id"]: bytes.fromhex(m["raw"]) for m in FIX["messages"]}
 EVID = os.path.join(ROOT, "re", "gp150", "evidence")
 GP5 = os.path.join(ROOT, "app", "tests", "fixtures", "gp5", "65-Puppy.prst")
 NOTIFY_TX = 0x0D  # tx id of the captured 0x08 import notification
+
+
+class _BlockedMido(types.ModuleType):
+    """Stands in for mido: any use of it (opening a port) fails the test."""
+
+    def __getattr__(self, name):
+        if name.startswith("__"):  # introspection (inspect, import machinery): just missing
+            raise AttributeError(name)
+        pytest.fail(f"test reached mido.{name} — a real MIDI port")
+
+
+@pytest.fixture(autouse=True)
+def _no_mido(monkeypatch):
+    monkeypatch.setitem(sys.modules, "mido", _BlockedMido("mido"))
 
 
 def stream(prefix):
@@ -173,6 +192,34 @@ def test_validate_rejects_a_stream_without_a_short_final_chunk():
     assert ok is False and "final" in why
 
 
+def import_frames_raw(prst, tid=0x24):
+    """An import stream for `prst` exactly as given (import_payload would force 0x0A)."""
+    return ht.chunk_frames(ht.FAMILY_PATCH, tid, ht.logical(ht.PAYLOAD_HEAD_IMPORT + bytes(prst)))
+
+
+def test_validate_rejects_transfer_id_zero():
+    b = bytearray(finger())
+    b[4] = 199
+    assert dw.validate_gp150_stream(ht.import_stream(0x24, bytes(b)), slot=199) == (True, "ok")
+    ok, why = dw.validate_gp150_stream(ht.import_stream(0, bytes(b)), slot=199)
+    assert ok is False and "transfer id" in why
+
+
+def test_validate_rejects_a_wrong_0x0a_byte_or_magic():
+    b = bytearray(finger())
+    b[4], b[0x0A] = 199, ht.IMPORT_BYTE_0A
+    assert dw.validate_gp150_stream(import_frames_raw(b), slot=199) == (True, "ok")  # the crafting is sound
+    for v in (0x58, 0x00):  # 0x58 = the exported file's value; Suite sends 0x5C
+        m = bytearray(b)
+        m[0x0A] = v
+        ok, why = dw.validate_gp150_stream(import_frames_raw(m), slot=199)
+        assert ok is False and "0x0A" in why, why
+    m = bytearray(b)
+    m[1] ^= 0xFF  # 11 30 64 04 -> 11 cf 64 04
+    ok, why = dw.validate_gp150_stream(import_frames_raw(m), slot=199)
+    assert ok is False and "magic" in why, why
+
+
 def test_validate_rejects_non_import_payloads_and_strays():
     prst = finger()
     export_shaped = ht.chunk_frames(ht.FAMILY_PATCH, 0x24, ht.logical(ht.PAYLOAD_HEAD_EXPORT + prst))
@@ -238,8 +285,10 @@ class ImportPedal:
     Knobs: ack, notify, notify_raw (another 0x08 frame), dead, extra(pedal, n)
     called on every host chunk (to inject unsolicited frames)."""
 
-    def __init__(self, ack=True, notify=True, notify_raw=None, notify_delay=0.02, dead=False, extra=None):
+    def __init__(self, ack=True, notify=True, notify_raw=None, notify_delay=0.02, dead=False, extra=None,
+                 fail_at=None):
         self.ack, self.notify, self.dead, self.extra = ack, notify, dead, extra
+        self.fail_at = fail_at  # chunk index whose send raises (a port error mid-stream)
         self.notify_raw = MSG["import_notify_08"] if notify_raw is None else notify_raw
         self.notify_delay = notify_delay
         self.queue = []
@@ -260,11 +309,13 @@ class ImportPedal:
         return [raw for _t, raw in ready]
 
     def receive(self, wire):
+        f = ht.parse_frame(wire)
+        if self.fail_at is not None and f.family == ht.FAMILY_PATCH and f.body[0] == self.fail_at:
+            raise OSError("MIDI output went away")
         self.sent.append(wire)
         self.sent_at.append(time.monotonic())
         if self.dead:
             return
-        f = ht.parse_frame(wire)
         if f.family == ht.FAMILY_ACK and f.tx4[1] == 0x01:
             return self.emit(MSG["hello_reply"])
         if f.family != ht.FAMILY_PATCH or not ht.is_chunk(f):
@@ -327,6 +378,24 @@ def test_send_gate_refuses_unverified_gp150():
     with pytest.raises(RuntimeError, match="confirm"):
         dw.send_stream(None, pk, validated=True, allow_unverified=True, session=session(p))
     assert p.sent == []
+
+
+def test_flipped_gate_without_a_session_still_never_opens_a_real_port(monkeypatch, midi_port_guard):
+    # Task 12 flips WRITE_VERIFIED["gp150"]; the default path (no session=) then
+    # opens the "GP-150" ports for real. Under test that must stop at the guard.
+    monkeypatch.setitem(dw.WRITE_VERIFIED, "gp150", True)
+    with pytest.raises(pytest.fail.Exception, match="real MIDI port"):
+        dw.send_stream("GP-150", good_stream(), confirm=True, validated=True)
+    assert midi_port_guard == ["GP-150"]
+    with pytest.raises(pytest.fail.Exception, match="real MIDI port"):
+        dw.send_stream(None, good_stream(), confirm=True, validated=True)
+    assert midi_port_guard == ["GP-150", ht_scan.PORT]
+
+
+def test_the_legacy_send_path_cannot_reach_mido_either():
+    gp5 = dw.build_patch_write_stream(open(GP5, "rb").read(), 3)
+    with pytest.raises(pytest.fail.Exception, match="mido"):
+        dw.send_stream("no-such-port", gp5, confirm=True, validated=True, allow_unverified=True)
 
 
 def test_send_refuses_an_invalid_stream_even_when_unverified_is_allowed():
@@ -406,13 +475,42 @@ def test_send_to_a_dead_pedal_raises_not_acked():
     assert p.sent == pk
 
 
+READ_BACK = "read slot 199 back before retrying"
+
+
 def test_send_rejects_an_unexpected_notify_payload():
     other = ht.frame(ht.FAMILY_IMPORT_DONE, bytes((0, 0, 0, 0x0E)),
                      b"\x01" + ht.enc(ht.logical(b"\x09\x03\x11\x31")))
     p = ImportPedal(notify_raw=other)
-    with pytest.raises(RuntimeError, match="unexpected"):
+    with pytest.raises(RuntimeError, match="unexpected") as ei:
         send(good_stream(), p)
+    assert READ_BACK in str(ei.value)
     assert len(p.acks_for(0x0E)) == 1  # still ACKed once by the session
+
+
+def test_send_rejects_an_unreadable_notify_with_a_read_back_hint():
+    logical = bytearray(ht.logical(ht.IMPORT_DONE_PAYLOAD))
+    logical[1] ^= 0xFF  # inner CRC wrong
+    garbled = ht.frame(ht.FAMILY_IMPORT_DONE, bytes((0, 0, 0, 0x0E)), b"\x01" + ht.enc(bytes(logical)))
+    p = ImportPedal(notify_raw=garbled)
+    with pytest.raises(RuntimeError, match="unreadable") as ei:
+        send(good_stream(), p)
+    assert READ_BACK in str(ei.value)
+
+
+def test_a_port_error_mid_stream_says_read_back():
+    p = ImportPedal(fail_at=4)
+    with pytest.raises(RuntimeError, match="failed while sending") as ei:
+        send(good_stream(), p)
+    assert READ_BACK in str(ei.value)
+    assert p.sent == good_stream()[:4]  # nothing after the failing chunk
+
+
+def test_silence_errors_say_read_back():
+    for pedal, kw in ((ImportPedal(notify=False), {}), (ImportPedal(dead=True), {})):
+        with pytest.raises(RuntimeError) as ei:
+            send(good_stream(), pedal, notify_timeout=0.1, **kw)
+        assert READ_BACK in str(ei.value), str(ei.value)
 
 
 def test_send_notify_without_ack_still_counts_as_notified():

@@ -125,6 +125,7 @@
         if (f.family !== HT.FAMILY_PATCH || f.tx4[0] !== 0x08 || !f.body.length) return [false, `packet ${i}: not a patch (0x70) chunk`];
         c = HT.chunkFields(f);
       } catch (e) { return [false, `packet ${i}: ${e.message}`]; }
+      if (c.transferId < 1) return [false, `packet ${i}: transfer id 0 (must be 1..0x7F)`];
       if (tid === null) tid = c.transferId;
       else if (c.transferId !== tid) return [false, `packet ${i}: transfer id ${c.transferId} != ${tid}`];
       if (c.index !== i) return [false, `packet ${i}: chunk index ${c.index} (expected ${i}, 0-based)`];

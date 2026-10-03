@@ -125,6 +125,23 @@ function reframe(w, { piece, idx, tid, off, family } = {}) {
   const eightBit = Array.from(HT.frame(HT.FAMILY_PATCH, [0x08, 0, 0, 0x80], Uint8Array.from([0, ...HT.enc([0])])));
   check("validate: data byte above 0x7F rejected", v([eightBit])[0] === false);
   check("validate: empty stream rejected", v([])[0] === false);
+  // transfer id 0 is not a transfer id (1..0x7F)
+  const b199 = Uint8Array.from(finger); b199[4] = 199;
+  check("validate: transfer id 0x24 accepted", v(HT.importStream(0x24, b199).map((w) => Array.from(w)), 199)[0] === true);
+  const t0 = v(HT.importStream(0, b199).map((w) => Array.from(w)), 199);
+  check("validate: transfer id 0 rejected", t0[0] === false && /transfer id/.test(t0[1]), t0[1]);
+  // the 0x0A import marker and the magic (crafted without importPayload, which forces 0x0A)
+  const raw = (prst) => HT.chunkFrames(HT.FAMILY_PATCH, 0x24, HT.logical(Uint8Array.from([0x01, 0x03, 0x11, 0x30, ...prst]))).map((w) => Array.from(w));
+  const okB = Uint8Array.from(b199); okB[0x0a] = 0x5c;
+  check("validate: crafted import stream accepted", v(raw(okB), 199)[0] === true, v(raw(okB), 199)[1]);
+  for (const val of [0x58, 0x00]) {
+    const m = Uint8Array.from(okB); m[0x0a] = val;
+    const r0a = v(raw(m), 199);
+    check(`validate: byte 0x0A = 0x${val.toString(16)} rejected`, r0a[0] === false && /0x0A/.test(r0a[1]), r0a[1]);
+  }
+  const mg = Uint8Array.from(okB); mg[1] ^= 0xff;
+  const rmg = v(raw(mg), 199);
+  check("validate: bad magic rejected", rmg[0] === false && /magic/.test(rmg[1]), rmg[1]);
   check("validateGp150Stream exported", typeof WW.validateGp150Stream === "function" && WW.validateGp150Stream(good, 199)[0] === true);
 }
 
@@ -147,15 +164,17 @@ function reframe(w, { piece, idx, tid, off, family } = {}) {
 // --- 5. HtTransport.writePreset against a fake pedal -------------------------------
 // After the final (short) 0x70 chunk the pedal ACKs the transfer id, then sends
 // the captured 0x08 notification (tx 0x0D) `notifyDelay` ms later.
-function importPedal({ ack = true, notify = true, notifyRaw = MSG.import_notify_08, notifyDelay = 30, dead = false, onChunk = null, name = "GP-150" } = {}) {
+function importPedal({ ack = true, notify = true, notifyRaw = MSG.import_notify_08, notifyDelay = 30, dead = false, onChunk = null, failAt = -1, name = "GP-150" } = {}) {
   const sent = [], sentAt = []; const input = { name, onmidimessage: null };
   let notifiedAt = 0;
   const deliver = (u8) => input.onmidimessage && input.onmidimessage({ data: u8 });
   const emit = (u8, ms = 1) => setTimeout(() => deliver(u8), ms);
   const output = { name, send(bytes) {
-    const w = Uint8Array.from(bytes); sent.push(w); sentAt.push(Date.now());
-    if (dead) return;
+    const w = Uint8Array.from(bytes);
     const f = HT.parseFrame(w);
+    if (f.family === HT.FAMILY_PATCH && f.body[0] === failAt) throw new Error("MIDI output went away"); // failAt: a port error
+    sent.push(w); sentAt.push(Date.now());
+    if (dead) return;
     if (f.family === 0x00 && f.tx4[1] === 0x01) return emit(MSG.hello_reply);
     if (f.family !== HT.FAMILY_PATCH || !HT.isChunk(f)) return;
     if (onChunk) onChunk(f.body[0], { emit, deliver });
@@ -274,6 +293,58 @@ const pk199 = WW.buildPatchWriteStream(finger, 199);
   check("write: close mid-write -> rejects 'session closed'", r.ok, r.why);
   check("write: close mid-write -> no further bytes", p.sent.length === n && n < 10, `${n} -> ${p.sent.length}`);
 }
+// --- errors that leave the slot unknown say "read slot N back before retrying" ------
+const READ_BACK = /read slot 199 back before retrying/;
+{
+  const cases = [
+    ["no 0x08", importPedal({ notify: false }), SHORT],
+    ["dead pedal", importPedal({ dead: true }), SHORT],
+    ["unexpected 0x08 payload", importPedal({ notifyRaw: HT.frame(HT.FAMILY_IMPORT_DONE, [0, 0, 0, 0x0e], Uint8Array.from([0x01, ...HT.enc(HT.logical([0x09, 0x03, 0x11, 0x31]))])) }), W],
+    ["unreadable 0x08", importPedal({ notifyRaw: (() => { const l = Uint8Array.from(HT.logical(HT.IMPORT_DONE_PAYLOAD)); l[1] ^= 0xff; return HT.frame(HT.FAMILY_IMPORT_DONE, [0, 0, 0, 0x0e], Uint8Array.from([0x01, ...HT.enc(l)])); })() }), W],
+    ["port error mid-stream", importPedal({ failAt: 4 }), W],
+  ];
+  for (const [what, p, opts] of cases) {
+    const s = T.create(p.input, p.output, opts);
+    const r = await rejects(s.writePreset(pk199), READ_BACK);
+    check(`read-back hint: ${what}`, r.ok, r.why);
+    s.close();
+  }
+  const pf = importPedal({ failAt: 4 });
+  const sf = T.create(pf.input, pf.output, W);
+  const rf = await rejects(sf.writePreset(pk199), /failed while sending/);
+  check("port error mid-stream -> 'failed while sending', nothing after it", rf.ok && pf.sent.length === 4, `${rf.why} sent=${pf.sent.length}`);
+  sf.close();
+}
+{ // close() after the final chunk went out (waiting for the 0x08): the slot may be written
+  const p = importPedal({ notify: false });
+  const s = T.create(p.input, p.output, W);
+  const pending = rejects(s.writePreset(pk199), /session closed/);
+  for (let i = 0; i < 200 && p.sent.length < 10; i++) await sleep(5);
+  await sleep(20);
+  s.close();
+  const r = await pending;
+  check("close after the final chunk -> 'session closed' + read-back hint", r.ok && READ_BACK.test(r.why) && /after the import/.test(r.why), r.why);
+}
+{ // close() mid-stream: an incomplete stream went out; still unknown until read back
+  const p = importPedal();
+  const s = T.create(p.input, p.output, Object.assign({}, W, { writePaceMs: 40 }));
+  const pending = rejects(s.writePreset(pk199), /session closed/);
+  await sleep(60);
+  s.close();
+  const r = await pending;
+  check("close mid-stream -> 'session closed' + read-back hint", r.ok && READ_BACK.test(r.why) && /of 10 chunks/.test(r.why), r.why);
+}
+{ // closed before anything went out: plain "session closed", nothing sent
+  const p = importPedal();
+  const s = T.create(p.input, p.output, W);
+  const first = s.hello(); // occupies the queue
+  const pending = rejects(s.writePreset(pk199), /session closed/);
+  s.close();
+  await first.catch(() => {});
+  const r = await pending;
+  check("closed before sending -> plain 'session closed', no chunks", r.ok && !READ_BACK.test(r.why) && !p.sent.some((w) => w[3] === HT.FAMILY_PATCH), r.why);
+}
+
 { // the session refuses frames that are not one 0x70 import stream, before sending
   const p = importPedal();
   const s = T.create(p.input, p.output, W);

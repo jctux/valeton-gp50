@@ -472,6 +472,16 @@ def test_session_without_ports_opens_them_lazily(monkeypatch):
     assert p.inp.closed and p.out.closed
 
 
+def test_no_test_can_open_the_real_ports(midi_port_guard):
+    # conftest's guard: a Session without fake ports, or the CLI without a
+    # session_factory, stops at the stub instead of opening the real GP-150 ports
+    with pytest.raises(pytest.fail.Exception, match="real MIDI port"):
+        ht_scan.Session(to_message=FakeMsg, open_delay=0, **FAST)
+    with pytest.raises(pytest.fail.Exception, match="real MIDI port"):
+        ht_scan.main(["hello"])
+    assert midi_port_guard == [ht_scan.PORT, ht_scan.PORT]
+
+
 def test_pick_port():
     assert ht_scan.pick_port(["AudioBox USB 96", "GP-150"], "GP-150") == "GP-150"
     assert ht_scan.pick_port(["GP-150 MIDI 1", "GP-50"], "GP-150") == "GP-150 MIDI 1"

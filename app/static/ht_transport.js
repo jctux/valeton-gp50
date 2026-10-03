@@ -93,7 +93,8 @@
     // with this exchange's handler already listening; `wire` is the last frame and
     // every timer starts when it is sent. Until then nothing ends the exchange or
     // counts as its ACK (frames are still collected; `beforeLast` = how many of
-    // `frames` arrived before the last frame went out). `ackId` names the ACK that
+    // `frames` arrived before the last frame went out; `sentFrames` = how many
+    // frames were handed to the output, the last one included). `ackId` names the ACK that
     // counts (default: the request's tx id; any ACK for raw bytes / chunk frames);
     // `idleMs` overrides how long to wait after that ACK.
     function exchange(wire, { stream = false, timeoutMs = o.timeoutMs, until = null, lead = [], paceMs = 0, ackId = null, idleMs = o.idleMs } = {}) {
@@ -103,7 +104,7 @@
       }
       return new Promise((resolve) => {
         const frames = [], chunks = [];
-        let t0 = Date.now(), sending = lead.length > 0, beforeLast = 0; // sending: lead frames still going out
+        let t0 = Date.now(), sending = lead.length > 0, beforeLast = 0, sentFrames = 0; // sending: lead frames still going out
         let ack = false, ackAt = 0, lastChunkAt = 0, done = false, tick = null;
         let sawTail = false; // non-zero-offset chunks seen with no offset-0 chunk before them
         const finish = (extra) => {
@@ -111,7 +112,7 @@
           done = true;
           if (current === handler) { current = null; abortCurrent = null; }
           clearInterval(tick);
-          resolve(Object.assign({ ack, frames, chunks, beforeLast }, extra));
+          resolve(Object.assign({ ack, frames, chunks, beforeLast, sentFrames }, extra));
         };
         const handler = (f, w) => {
           if (f.family === HT.FAMILY_ACK && !HT.isChunk(f)) {
@@ -150,13 +151,13 @@
           } else if (ack && now - ackAt > idleMs) finish();
           if (now - t0 > timeoutMs + (stream ? o.emptyTimeoutMs : 0)) finish({ timeout: true });
         }, o.tickMs);
-        if (!sending) { try { send(wire); } catch (err) { finish({ error: err }); } return; }
+        if (!sending) { try { sentFrames++; send(wire); } catch (err) { finish({ error: err }); } return; }
         (async () => {
           try {
-            for (const w of lead) { if (done) return; send(w); await sleep(paceMs); }
+            for (const w of lead) { if (done) return; sentFrames++; send(w); await sleep(paceMs); }
             if (done) return;
             beforeLast = frames.length; t0 = Date.now(); sending = false;
-            send(wire);
+            sentFrames++; send(wire);
           } catch (err) { finish({ error: err }); }
         })();
       });
@@ -259,6 +260,8 @@
 
     // --- preset import (the GP-150 write) -------------------------------------
     const isImportDone = (f) => f.family === HT.FAMILY_IMPORT_DONE && !HT.isChunk(f);
+    // The hint on every error that leaves the slot's state unknown.
+    const readBack = (slot) => `read slot ${slot} back before retrying: it may or may not have been written`;
     const hexOf = (b) => Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 
     // `x` = a 1128-byte preset (imported to the slot in its own index byte 0x04) or
@@ -304,18 +307,22 @@
           lead: packets.slice(0, -1), paceMs: w.paceMs, ackId: transferId, until: isImportDone,
           idleMs: w.notifyTimeoutMs, timeoutMs: o.timeoutMs + w.notifyTimeoutMs,
         });
-        if (r.aborted) throw r.error;
-        if (r.error) throw new Error(`GP-150 import to slot ${slot} failed while sending: ${r.error.message}`);
+        if (r.aborted) { // close() mid-write: plain only if nothing went out yet
+          if (!r.sentFrames) throw r.error;
+          const when = r.sentFrames >= packets.length ? `after the import to slot ${slot} was sent` : `mid-import (${r.sentFrames} of ${packets.length} chunks sent)`;
+          throw new Error(`session closed ${when} — ${readBack(slot)}`);
+        }
+        if (r.error) throw new Error(`GP-150 import to slot ${slot} failed while sending (${r.error.message}) — ${readBack(slot)}`);
         if (r.frames.slice(0, r.beforeLast).some(isImportDone)) log("warn", "a 0x08 notification arrived before the import was complete (ignored)");
         const note = r.frames.slice(r.beforeLast).find(isImportDone); // only an answer to the whole stream counts
         if (!note) {
-          if (!r.ack) throw new Error(`GP-150 did not ACK the import to slot ${slot} (${NOT_RESPONDING}). Read slot ${slot} back before retrying: it may or may not have been written.`);
-          throw new Error(`GP-150 ACKed the import to slot ${slot} but sent no 0x08 'import done' within ${w.notifyTimeoutMs} ms — read slot ${slot} back before trusting or retrying the write`);
+          if (!r.ack) throw new Error(`GP-150 did not ACK the import to slot ${slot} (${NOT_RESPONDING}) — ${readBack(slot)}`);
+          throw new Error(`GP-150 ACKed the import to slot ${slot} but sent no 0x08 'import done' within ${w.notifyTimeoutMs} ms — ${readBack(slot)}`);
         }
         let got;
-        try { got = HT.shortPayload(note); } catch (err) { throw new Error(`GP-150 sent an unreadable 0x08 notification after the import (${err.message})`); }
+        try { got = HT.shortPayload(note); } catch (err) { throw new Error(`GP-150 sent an unreadable 0x08 notification after the import to slot ${slot} (${err.message}) — ${readBack(slot)}`); }
         if (hexOf(got) !== hexOf(HT.IMPORT_DONE_PAYLOAD)) {
-          throw new Error(`GP-150 answered the import to slot ${slot} with an unexpected 0x08 payload ${hexOf(got)} (Suite capture: ${hexOf(HT.IMPORT_DONE_PAYLOAD)}) — read slot ${slot} back`);
+          throw new Error(`GP-150 answered the import to slot ${slot} with an unexpected 0x08 payload ${hexOf(got)} (Suite capture: ${hexOf(HT.IMPORT_DONE_PAYLOAD)}) — ${readBack(slot)}`);
         }
         return { sent: packets.length, acks: r.ack ? 1 : 0, notified: true };
       });

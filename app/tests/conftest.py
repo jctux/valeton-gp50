@@ -21,6 +21,28 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
 
 
 @pytest.fixture(autouse=True)
+def midi_port_guard(monkeypatch):
+    """No test may open the GP-150's real MIDI ports, whatever WRITE_VERIFIED says:
+    with the pedal on USB (and mido installed, e.g. .venv-midi) a test that reached
+    patch.ht_scan.open_ports could read from — or, through
+    device_write.send_stream, write to — the real pedal. The stub records the port
+    and fails the test (pytest.fail raises a BaseException, so no `except
+    Exception` in the code under test can swallow it). A test that drives the
+    lazy-open path monkeypatches open_ports itself, which overrides this. Request
+    the fixture by name to read the attempted port names."""
+    from patch import ht_scan
+
+    attempts = []
+
+    def blocked(port=ht_scan.PORT):
+        attempts.append(port)
+        pytest.fail(f"test tried to open the real MIDI port {port!r}")
+
+    monkeypatch.setattr(ht_scan, "open_ports", blocked)
+    return attempts
+
+
+@pytest.fixture(autouse=True)
 def _pin_fixture_exports(monkeypatch):
     """Tests use the presetExports fixtures deterministically, even when a local
     device_scan/ (from a live scan) exists and would otherwise shadow them."""
