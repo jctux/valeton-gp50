@@ -1,0 +1,7748 @@
+{
+ "AMP": {
+  "0": {
+   "name": "Tweedy CL",
+   "origin": "Fender Tweed Deluxe Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "1": {
+   "name": "Tweedy",
+   "origin": "Fender Tweed Deluxe",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "2": {
+   "name": "PickUp S-H Sim",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "3": {
+   "name": "Bellman 59N",
+   "origin": "Fender '59 Bassman Normal",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "4": {
+   "name": "Dark Twin",
+   "origin": "Fender Twin Reverb",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "7": {
+   "name": "PickUp H-S Sim",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "9": {
+   "name": "AC Pre",
+   "origin": "Acoustic Preamp",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "11": {
+   "name": "Foxy 30N",
+   "origin": "VOX AC30 Normal, variant",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "13": {
+   "name": "Silver Twin",
+   "origin": "Fender Twin Reverb Silver",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "15": {
+   "name": "SUPDual CL",
+   "origin": "Superbass Dual Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "17": {
+   "name": "Foxy 30N",
+   "origin": "VOX AC30 Normal",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone Cut",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "20": {
+   "name": "J-120 CL",
+   "origin": "Roland Jazz Chorus",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "25": {
+   "name": "Match CL",
+   "origin": "Matchless Chieftain Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "26": {
+   "name": "L-Star CL",
+   "origin": "L-series Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "27": {
+   "name": "Z38 CL",
+   "origin": "Dr Z Route 66 Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "31": {
+   "name": "Knights CL",
+   "origin": "Peavey 5150 Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "33": {
+   "name": "SnapTone AMP",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "34": {
+   "name": "Bad KT CL",
+   "origin": "Bad Cat Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "35": {
+   "name": "Solo100 CL",
+   "origin": "Soldano SLO100 Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "36": {
+   "name": "Bellman 59B",
+   "origin": "Fender '59 Bassman Bright",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "39": {
+   "name": "Foxy 30TB",
+   "origin": "VOX AC30 Top Boost",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone Cut",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "40": {
+   "name": "SUPDual OD",
+   "origin": "Superbass Dual Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone 1",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone 2",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "42": {
+   "name": "UK45 CL",
+   "origin": "Marshall JTM45 Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "43": {
+   "name": "UK45 OD",
+   "origin": "Marshall JTM45 Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "44": {
+   "name": "UK45 JP",
+   "origin": "Marshall JTM45 Jump",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "45": {
+   "name": "UK50 CL",
+   "origin": "Marshall 1959SLP Clean",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "46": {
+   "name": "UK50 OD",
+   "origin": "Marshall 1959SLP Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "47": {
+   "name": "UK50 JP",
+   "origin": "Marshall 1959SLP Jump",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "48": {
+   "name": "UK SLP",
+   "origin": "Marshall Super Lead Plexi",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "53": {
+   "name": "UK800",
+   "origin": "Marshall JCM800",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "57": {
+   "name": "Flagman 1",
+   "origin": "Mesa Boogie MkIIC+ Ch1",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "58": {
+   "name": "Flagman 2",
+   "origin": "Mesa Boogie MkIIC+ Ch2",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "59": {
+   "name": "Flagman 3",
+   "origin": "Mesa Boogie MkIIC+ Ch3",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "61": {
+   "name": "L-Star OD",
+   "origin": "L-series Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "64": {
+   "name": "Fryman B1",
+   "origin": "Friedman BE-100 Ch1",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "67": {
+   "name": "Bog-XT Blue V",
+   "origin": "Bogner Ecstasy Blue Vintage",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "68": {
+   "name": "Bog-XT Blue M",
+   "origin": "Bogner Ecstasy Blue Modern",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "71": {
+   "name": "Solo100 Crunch",
+   "origin": "Soldano SLO100 Crunch",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "73": {
+   "name": "Z38 OD",
+   "origin": "Dr Z Route 66 Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "74": {
+   "name": "Match OD",
+   "origin": "Matchless Chieftain Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "75": {
+   "name": "Bad KT OD",
+   "origin": "Bad Cat Drive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "83": {
+   "name": "Citrus R100",
+   "origin": "Orange Rockerverb 100",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "85": {
+   "name": "Flagman IV",
+   "origin": "Mesa Boogie Mark IV",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "89": {
+   "name": "Solo100 Lead",
+   "origin": "Soldano SLO100 Lead",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "90": {
+   "name": "Eddie51",
+   "origin": "EVH 5150 III",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "93": {
+   "name": "Fryman HB+",
+   "origin": "Friedman HBE-100",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "95": {
+   "name": "Engle Saga 1",
+   "origin": "ENGL Savage 120",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "99": {
+   "name": "Powerman Lead",
+   "origin": "ENGL Powerball Lead",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "101": {
+   "name": "Dizzle VHB",
+   "origin": "Diezel VH4 B-channel",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "104": {
+   "name": "Rect Dual V",
+   "origin": "Mesa Dual Rectifier Vintage",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "105": {
+   "name": "Rect Dual M",
+   "origin": "Mesa Dual Rectifier Modern",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "109": {
+   "name": "Bog-XT Red V",
+   "origin": "Bogner Ecstasy Red Vintage",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "110": {
+   "name": "Bog-XT Red M",
+   "origin": "Bogner Ecstasy Red Modern",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "115": {
+   "name": "Ampage Classic",
+   "origin": "Ampeg SVT Classic",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "117": {
+   "name": "Mess Bass 400",
+   "origin": "Mesa Bass 400+",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "119": {
+   "name": "Voxy Bass",
+   "origin": "VOX AC Bass",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "122": {
+   "name": "Alchemy Pre",
+   "origin": "Bass Preamp",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "123": {
+   "name": "Knights CL+",
+   "origin": "Peavey 5150 Clean+",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "124": {
+   "name": "Knights OD",
+   "origin": "Peavey 5150 Lead",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "N->S": {
+  "0": {
+   "name": "Empty N→S",
+   "origin": "no model",
+   "params": [
+    {
+     "name": "R1",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R2",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R3",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 5,
+     "range": "0–100",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 6,
+     "range": "0–20001",
+     "unit": "Hz"
+    }
+   ]
+  },
+  "27": {
+   "name": "SnapTone NAM Basic",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "33": {
+   "name": "SnapTone Standard",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Release",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 3,
+     "range": "200–200",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 4,
+     "range": "0–500",
+     "unit": "Hz"
+    },
+    {
+     "name": "Sentinel",
+     "index": 5,
+     "range": "-3–-3",
+     "unit": ""
+    }
+   ]
+  },
+  "57": {
+   "name": "SnapTone DST",
+   "origin": "Tube Clipper",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "64": {
+   "name": "SnapTone DST",
+   "origin": "Black Bass",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "112": {
+   "name": "SnapTone CAB IR",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved1",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    }
+   ]
+  },
+  "122": {
+   "name": "SnapTone Bass AMP",
+   "origin": "Alchemy Pre",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "CAB": {
+  "0": {
+   "name": "1×12 Tweed",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "16": {
+   "name": "2×12 Fender",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "32": {
+   "name": "4×12 UK",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "33": {
+   "name": "SnapTone CAB",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R2",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R3",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 3,
+     "range": "0–500",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 4,
+     "range": "0–1000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Sentinel",
+     "index": 5,
+     "range": "-10–10",
+     "unit": ""
+    }
+   ]
+  },
+  "48": {
+   "name": "1×12 JZ",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "60": {
+   "name": "2×12 Engl",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "64": {
+   "name": "2×12 BOG",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "80": {
+   "name": "4×12 UK2",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "96": {
+   "name": "4×12 Rect",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "112": {
+   "name": "4×12 Flag",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "128": {
+   "name": "2×12 DC",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "144": {
+   "name": "2×12 Match",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "160": {
+   "name": "4×12 Engl",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "176": {
+   "name": "4×12 Peavey",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "192": {
+   "name": "1×12 Foxy",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "208": {
+   "name": "4×12 US",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "224": {
+   "name": "2×12 Tweed",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "240": {
+   "name": "4×12 Citrus",
+   "origin": "",
+   "params": [
+    {
+     "name": "Reserved",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved3",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved4",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mic Pos",
+     "index": 5,
+     "range": "0–250",
+     "unit": ""
+    },
+    {
+     "name": "High Cut",
+     "index": 6,
+     "range": "6000–21000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Dual Mic",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "PRE": {
+  "0": {
+   "name": "COMP",
+   "origin": "Ross Compressor",
+   "params": [
+    {
+     "name": "Sustain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "+3dB",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "1": {
+   "name": "COMP4",
+   "origin": "Keeley C4",
+   "params": [
+    {
+     "name": "Sustain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Attack",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Clipping",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "2": {
+   "name": "Micro Boost",
+   "origin": "MXR M133",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "+3dB",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "6": {
+   "name": "OD 9",
+   "origin": "Ibanez TS9",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Fat",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "8": {
+   "name": "Penesas",
+   "origin": "Klon Centaur",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "11": {
+   "name": "B-Boost",
+   "origin": "Xotic BB Preamp variant",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "16": {
+   "name": "OCTA",
+   "origin": "Polyphonic Octave",
+   "params": [
+    {
+     "name": "Low Oct",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "High Oct",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Dry",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "20": {
+   "name": "AC Sim",
+   "origin": "Acoustic Simulator",
+   "params": [
+    {
+     "name": "Body",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Top",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "26": {
+   "name": "EP Boost",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "34": {
+   "name": "Darktale",
+   "origin": "ProCo RAT",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Filter",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R8",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R9",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 9,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "36": {
+   "name": "La Charger",
+   "origin": "Marshall Guv'nor variant",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R8",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R9",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 9,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "43": {
+   "name": "Bass Preamp",
+   "origin": "Darkglass B7K",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Blend",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Lo-mid",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Hi-mid",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R8",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R9",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Attack",
+     "index": 9,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "68": {
+   "name": "Flagman Dist",
+   "origin": "British Hi-Gain",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tight",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R8",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R9",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 9,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "81": {
+   "name": "Bass Hammer",
+   "origin": "Aguilar Tone Hammer",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Master",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mid Freq",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Drive",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "DST": {
+  "1": {
+   "name": "OD 9",
+   "origin": "TS9 in DST slot",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "3": {
+   "name": "Penesas",
+   "origin": "Klon in DST",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "4": {
+   "name": "Super OD",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "13": {
+   "name": "Blues OD",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "17": {
+   "name": "Scream OD",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Fat",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "20": {
+   "name": "Green OD",
+   "origin": "TS-808",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "21": {
+   "name": "Yellow OD",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "25": {
+   "name": "Lazaro",
+   "origin": "EHX Big Muff",
+   "params": [
+    {
+     "name": "Sustain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "27": {
+   "name": "Fuzz",
+   "origin": "Fuzz Face",
+   "params": [
+    {
+     "name": "Fuzz",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "33": {
+   "name": "SnapTone",
+   "origin": "in DST slot",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 3,
+     "range": "0–500",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 4,
+     "range": "0–1000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Sentinel",
+     "index": 5,
+     "range": "-10–10",
+     "unit": ""
+    }
+   ]
+  },
+  "36": {
+   "name": "Chief",
+   "origin": "Marshall Guv'nor",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "39": {
+   "name": "Force",
+   "origin": "Fulltone OCD",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "43": {
+   "name": "Flex OD",
+   "origin": "Bass OD",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Blend",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "46": {
+   "name": "SM Dist",
+   "origin": "Orange-style",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "47": {
+   "name": "Red Haze",
+   "origin": "MXR Distortion+",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "53": {
+   "name": "Tube Clipper",
+   "origin": "12AX7 OD",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "58": {
+   "name": "TaiChi OD",
+   "origin": "Hermida Zendrive",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Voice",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "59": {
+   "name": "Plustortion",
+   "origin": "MXR Distortion+",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "64": {
+   "name": "Black Bass",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "67": {
+   "name": "Micro Bass Boost",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "72": {
+   "name": "Bass OD",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Blend",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "73": {
+   "name": "Flagman Dist Hi-Gain",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "78": {
+   "name": "B-Boost",
+   "origin": "Xotic BB Preamp",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "89": {
+   "name": "Bass Hammer Dist",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Blend",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "90": {
+   "name": "UK 800 / Marshall Hi-Gain",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "93": {
+   "name": "Ring Mod Dist",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "95": {
+   "name": "Saturate",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "104": {
+   "name": "La Charger",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tight",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "105": {
+   "name": "Flagman 2/3",
+   "origin": "Mesa MkIIC+",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "110": {
+   "name": "Mess DIST",
+   "origin": "Mesa Mark IV",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "115": {
+   "name": "UK 900",
+   "origin": "JCM900",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "117": {
+   "name": "Rect",
+   "origin": "Mesa Rectifier",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "118": {
+   "name": "Citrus OD",
+   "origin": "Orange Amp",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bright",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "119": {
+   "name": "Peavey Lead",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "122": {
+   "name": "SLO",
+   "origin": "Soldano SLO100",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Bass",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Middle",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Treble",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Presence",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "WAH": {
+  "4": {
+   "name": "V-Wah",
+   "origin": "VOX V846",
+   "params": [
+    {
+     "name": "Range",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Q",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Position",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "11": {
+   "name": "Auto Filter / Step Filter",
+   "origin": "",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "High",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R8",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R9",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 9,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "90": {
+   "name": "B-Wah",
+   "origin": "Bass Wah",
+   "params": [
+    {
+     "name": "Range",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Q",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R4",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R5",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R6",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Position",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "NR": {
+  "1": {
+   "name": "Gate",
+   "origin": "",
+   "params": [
+    {
+     "name": "Threshold",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Attack",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Release",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "16": {
+   "name": "Inverse Expander",
+   "origin": "",
+   "params": [
+    {
+     "name": "Threshold",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Attack",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Release",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Hold",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 5,
+     "range": "0–100",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 6,
+     "range": "0–20001",
+     "unit": "Hz"
+    }
+   ]
+  },
+  "33": {
+   "name": "Inverse Expander+",
+   "origin": "",
+   "params": [
+    {
+     "name": "Gain",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Release",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Freq",
+     "index": 3,
+     "range": "0–500",
+     "unit": "Hz"
+    },
+    {
+     "name": "High Freq",
+     "index": 4,
+     "range": "0–1000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Sentinel",
+     "index": 5,
+     "range": "-10–10",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "EQ": {
+  "25": {
+   "name": "10-Band EQ",
+   "origin": "",
+   "params": [
+    {
+     "name": "Band 1",
+     "index": 0,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "Band 2",
+     "index": 1,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "53": {
+   "name": "Guitar EQ 1",
+   "origin": "5-Band: 125/400/800Hz·1.6/4kHz",
+   "params": [
+    {
+     "name": "125Hz",
+     "index": 0,
+     "range": "-25–15",
+     "unit": "dB"
+    },
+    {
+     "name": "400Hz",
+     "index": 1,
+     "range": "-25–15",
+     "unit": "dB"
+    },
+    {
+     "name": "800Hz",
+     "index": 2,
+     "range": "-25–15",
+     "unit": "dB"
+    },
+    {
+     "name": "1.6kHz",
+     "index": 3,
+     "range": "-25–15",
+     "unit": "dB"
+    },
+    {
+     "name": "4kHz",
+     "index": 4,
+     "range": "-25–15",
+     "unit": "dB"
+    },
+    {
+     "name": "Volume",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "54": {
+   "name": "Guitar EQ 2",
+   "origin": "5-Band: 100/500Hz·1/3/6kHz",
+   "params": [
+    {
+     "name": "100Hz",
+     "index": 0,
+     "range": "-50–25",
+     "unit": "dB"
+    },
+    {
+     "name": "500Hz",
+     "index": 1,
+     "range": "-50–25",
+     "unit": "dB"
+    },
+    {
+     "name": "1kHz",
+     "index": 2,
+     "range": "-50–25",
+     "unit": "dB"
+    },
+    {
+     "name": "3kHz",
+     "index": 3,
+     "range": "-50–25",
+     "unit": "dB"
+    },
+    {
+     "name": "6kHz",
+     "index": 4,
+     "range": "-50–25",
+     "unit": "dB"
+    },
+    {
+     "name": "Volume",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "57": {
+   "name": "Bass EQ 1",
+   "origin": "5-Band: 33/150/600Hz·2/8kHz",
+   "params": [
+    {
+     "name": "33Hz",
+     "index": 0,
+     "range": "-15–20",
+     "unit": "dB"
+    },
+    {
+     "name": "150Hz",
+     "index": 1,
+     "range": "-15–20",
+     "unit": "dB"
+    },
+    {
+     "name": "600Hz",
+     "index": 2,
+     "range": "-15–20",
+     "unit": "dB"
+    },
+    {
+     "name": "2kHz",
+     "index": 3,
+     "range": "-15–20",
+     "unit": "dB"
+    },
+    {
+     "name": "8kHz",
+     "index": 4,
+     "range": "-15–20",
+     "unit": "dB"
+    },
+    {
+     "name": "Volume",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "60": {
+   "name": "Mesa EQ",
+   "origin": "5-Band V-EQ: 80/240/750Hz·2.2/6.6kHz",
+   "params": [
+    {
+     "name": "80Hz",
+     "index": 0,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "240Hz",
+     "index": 1,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "750Hz",
+     "index": 2,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "2.2kHz",
+     "index": 3,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "6.6kHz",
+     "index": 4,
+     "range": "-15–15",
+     "unit": "dB"
+    },
+    {
+     "name": "Volume",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "MOD": {
+  "1": {
+   "name": "G-Chorus",
+   "origin": "Analog Ensemble Chorus",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–10",
+     "unit": "Hz"
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "2": {
+   "name": "C-Chorus",
+   "origin": "Mode-Only Chorus",
+   "params": [
+    {
+     "name": "Rate",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate2",
+     "index": 1,
+     "range": "0–10",
+     "unit": ""
+    }
+   ]
+  },
+  "8": {
+   "name": "B-Chorus",
+   "origin": "Bass Chorus",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–10",
+     "unit": "Hz"
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "17": {
+   "name": "Flanger",
+   "origin": "Jet Flanger",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–20",
+     "unit": "Hz"
+    },
+    {
+     "name": "Pre Delay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "23": {
+   "name": "Vibrato",
+   "origin": "",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–10",
+     "unit": "Hz"
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "32": {
+   "name": "Phaser",
+   "origin": "",
+   "params": [
+    {
+     "name": "Rate",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mode",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "33": {
+   "name": "O-Trem",
+   "origin": "Opto Tremolo / Demeter Tremulator",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–10",
+     "unit": "Hz"
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "41": {
+   "name": "Detune",
+   "origin": "",
+   "params": [
+    {
+     "name": "Detune",
+     "index": 0,
+     "range": "-50–50",
+     "unit": "cents"
+    },
+    {
+     "name": "Volume",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Dry/Wet",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "45": {
+   "name": "Auto Swell",
+   "origin": "",
+   "params": [
+    {
+     "name": "Attack",
+     "index": 0,
+     "range": "0–3000",
+     "unit": "ms"
+    },
+    {
+     "name": "Curve",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "54": {
+   "name": "Jet B",
+   "origin": "B-Flanger",
+   "params": [
+    {
+     "name": "Depth",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Rate",
+     "index": 1,
+     "range": "0–20",
+     "unit": "Hz"
+    },
+    {
+     "name": "Pre Delay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Volume",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "DLY": {
+  "0": {
+   "name": "Pure Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "2": {
+   "name": "Tape Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "3": {
+   "name": "Dual Echo",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix A",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback A",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time A",
+     "index": 2,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Mix B",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback B",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time B",
+     "index": 5,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "A Sync",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "B Sync",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "4": {
+   "name": "Ping Pong Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback A",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time A",
+     "index": 2,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback B",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time B",
+     "index": 4,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–1000",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "A Sync",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "5": {
+   "name": "Slapback Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 2,
+     "range": "1–500",
+     "unit": "ms"
+    },
+    {
+     "name": "Level",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Spread",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "6": {
+   "name": "Sweep Echo",
+   "origin": "Modulated Delay",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 2,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Sweep Rate",
+     "index": 3,
+     "range": "0–300",
+     "unit": ""
+    },
+    {
+     "name": "Sweep Depth",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "R7",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time Sync",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 8,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "9": {
+   "name": "Ring Echo",
+   "origin": "",
+   "params": [
+    {
+     "name": "Dly Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Ring Mix",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 2,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Tone",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Freq",
+     "index": 6,
+     "range": "0–5000",
+     "unit": "Hz"
+    },
+    {
+     "name": "Sync",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "11": {
+   "name": "Tube Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tube",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "13": {
+   "name": "Sweet Echo",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "18": {
+   "name": "999 Echo",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "20": {
+   "name": "Vintage Rack Delay",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mod",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Feedback",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "29": {
+   "name": "BBD Delay S",
+   "origin": "Stereo Analog",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time L",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Time R%",
+     "index": 2,
+     "range": "0–500",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Spread",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "31": {
+   "name": "Digital Delay S",
+   "origin": "Stereo",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time L",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Time R%",
+     "index": 2,
+     "range": "0–500",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Spread",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time Sync2",
+     "index": 7,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "40": {
+   "name": "Rev Echo",
+   "origin": "Reverse Echo",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Time",
+     "index": 1,
+     "range": "1–2000",
+     "unit": "ms"
+    },
+    {
+     "name": "Feedback",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Sync",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "RVB": {
+  "0": {
+   "name": "Room",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Pre Delay",
+     "index": 1,
+     "range": "0–100",
+     "unit": "ms"
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "1": {
+   "name": "Hall",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Pre Delay",
+     "index": 1,
+     "range": "0–100",
+     "unit": "ms"
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "2": {
+   "name": "Plate",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Decay",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "High Damp",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "3": {
+   "name": "Spring",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Decay",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "4": {
+   "name": "Church",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Decay",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Tone",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved2",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "6": {
+   "name": "N-Star",
+   "origin": "Northstar Reverb",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Decay",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "8": {
+   "name": "Sweet Space",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Pre Delay",
+     "index": 1,
+     "range": "0–100",
+     "unit": "ms"
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Lo End",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Reserved",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "9": {
+   "name": "Shimmer",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Pre Delay",
+     "index": 1,
+     "range": "0–100",
+     "unit": "ms"
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Lo End",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Hi End",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "13": {
+   "name": "Concert",
+   "origin": "Concert Hall",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Pre Delay",
+     "index": 1,
+     "range": "0–100",
+     "unit": "ms"
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Damp",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Hi Damp",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Mod",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 6,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  },
+  "18": {
+   "name": "Tube Spring",
+   "origin": "",
+   "params": [
+    {
+     "name": "Mix",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Level",
+     "index": 1,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Decay",
+     "index": 2,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Low Damp",
+     "index": 3,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Hi Damp",
+     "index": 4,
+     "range": "0–100",
+     "unit": ""
+    },
+    {
+     "name": "Trail",
+     "index": 5,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ },
+ "VOL": {
+  "3": {
+   "name": "Volume",
+   "origin": "",
+   "params": [
+    {
+     "name": "Volume",
+     "index": 0,
+     "range": "0–100",
+     "unit": ""
+    }
+   ]
+  }
+ }
+}
