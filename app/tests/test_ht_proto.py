@@ -76,3 +76,14 @@ def test_live_gp150_stream_decodes():
     payload = ht.parse_logical(data)
     prst = ht.preset_from_payload(payload)
     assert prst == open(os.path.join(EVID, "100-active.prst"), "rb").read()
+
+
+def test_short_payload_reads_requests_and_the_import_notify():
+    assert ht.short_payload(ht.parse_frame(MSG["export_req_slot1"])) == bytes.fromhex("0303113011300200000001")
+    note = ht.parse_frame(MSG["import_notify_08"])  # flag byte 01, not 00
+    assert note.family == ht.FAMILY_IMPORT_DONE and note.body[0] == 0x01
+    assert ht.short_payload(note) == ht.IMPORT_DONE_PAYLOAD == bytes.fromhex("09031130")
+    with pytest.raises(ValueError):
+        ht.short_payload(ht.parse_frame(MSG["import_stream_slot1_0"]))  # a chunk
+    with pytest.raises(ValueError):
+        ht.short_payload(ht.parse_frame(MSG["import_done_ack"]))  # an ACK has no logical message

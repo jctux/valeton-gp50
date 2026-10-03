@@ -18,7 +18,10 @@ pedal resend the whole stream), device short messages carrying a tx id ACKed.
 `Session` is importable without mido or a pedal: it opens the "GP-150" ports
 lazily, and tests inject fake ports (anything with `iter_pending()` yielding
 objects with `.type`/`.bytes()`, and `send(msg)`) plus `to_message`.
-patch/ht_write_verify.py (Task 12) builds on `Session().hello/read/send/inp`.
+patch/ht_write_verify.py (Task 12) builds on `Session().hello/read/send/inp`; the
+gated preset import lives in patch/device_write.py (send_stream(..., session=s)),
+which drives `Session.exchange(lead=...)` so the session's ACK duties stay the only
+ones. This CLI itself never writes.
 """
 from __future__ import annotations
 
@@ -27,7 +30,7 @@ import json
 import os
 import sys
 import time
-from typing import Callable, Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
@@ -225,7 +228,8 @@ class Session:
             time.sleep(self.tick)
 
     def exchange(self, wire: bytes, stream: bool = False, until: Optional[Callable[[ht.Frame], bool]] = None,
-                 timeout: Optional[float] = None) -> Reply:
+                 timeout: Optional[float] = None, *, lead: Sequence[bytes] = (), pace: float = 0.0,
+                 ack_id: Optional[int] = None, idle: Optional[float] = None) -> Reply:
         """Send `wire`, collect frames until done, settle. Never raises for the
         pedal's behaviour; the Reply says what happened.
           non-stream: done on the first non-ACK, non-chunk frame (or handshake
@@ -233,25 +237,35 @@ class Session:
           stream: done on the final (short) chunk (assembled -> payload, or error),
             `silent` when no chunk arrived `empty_timeout` after the ACK (after the
             send if there was no ACK), error when only a tail (no offset-0 chunk)
-            came or the stream stalled `idle` before its final chunk."""
+            came or the stream stalled `idle` before its final chunk.
+        Multi-frame requests (the gated GP-150 import, device_write.send_stream):
+        `lead` frames go out first, `pace` s apart, with the input serviced (ACK
+        duties, frames collected) in between; `wire` is the last frame and every
+        timer starts when it is sent. `ack_id` names the ACK that counts (default:
+        the request's tx id; any ACK for raw bytes / chunk frames); `idle`
+        overrides how long to wait after that ACK."""
         timeout = self.timeout if timeout is None else timeout
-        want = None  # the request's tx id; the device's ACK echoes it
-        try:
-            rf = ht.parse_frame(bytes(wire))
-            if rf.family != ht.FAMILY_ACK and not ht.is_chunk(rf):
-                want = rf.tx4[3]
-        except ValueError:
-            pass  # raw bytes: any ACK counts
+        idle = self.idle if idle is None else idle
+        want = ack_id  # the ACK id that counts; by default the request's tx id
+        if want is None:
+            try:
+                rf = ht.parse_frame(bytes(wire))
+                if rf.family != ht.FAMILY_ACK and not ht.is_chunk(rf):
+                    want = rf.tx4[3]
+            except ValueError:
+                pass  # raw bytes: any ACK counts
         self.pump(0)
         r = Reply()
         saw_tail = False  # non-zero-offset chunks seen with no offset-0 chunk before them
         ack_at = last_chunk_at = 0.0
+        queue = list(lead) + [wire]  # frames still to send; timers start with the last one
         t0 = time.monotonic()
         try:
-            self.send(wire)
+            self.send(queue.pop(0))
         except Exception as e:  # noqa: BLE001
             r.error = e
             return r
+        next_send_at = time.monotonic() + pace
         done = False
         while not done:
             for f, raw in list(self._frames()):  # duties for the whole batch first
@@ -292,6 +306,18 @@ class Session:
             if done:
                 break
             now = time.monotonic()
+            if queue:  # still sending the lead: no verdicts yet
+                if now >= next_send_at:
+                    if len(queue) == 1:
+                        t0 = time.monotonic()
+                    try:
+                        self.send(queue.pop(0))
+                    except Exception as e:  # noqa: BLE001
+                        r.error = e
+                        break
+                    next_send_at = time.monotonic() + pace
+                time.sleep(self.tick)
+                continue
             if stream:
                 if r.chunks:
                     if now - last_chunk_at > self.idle:
@@ -303,7 +329,7 @@ class Session:
                     else:
                         r.silent = True
                     break
-            elif r.ack and now - ack_at > self.idle:
+            elif r.ack and now - ack_at > idle:
                 break
             if now - t0 > timeout + (self.empty_timeout if stream else 0):
                 r.timeout = True

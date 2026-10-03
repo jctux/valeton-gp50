@@ -410,6 +410,51 @@ def test_read_rejects_out_of_range_slots():
             s.read(bad)
 
 
+# --- multi-frame exchange (the gated GP-150 import in device_write.send_stream) ------
+
+def test_exchange_sends_lead_frames_first_paced_and_collects_meanwhile():
+    p = FakePedal()
+    s = session(p, **FAST)
+    lead = [ht.ack(0x11), ht.ack(0x12), ht.ack(0x13)]
+    p.emit(MSG["ident_reply"], delay=0.01)  # lands while the lead is still going out
+    r = s.exchange(ht.hello(), lead=lead, pace=0.02, until=lambda f: f.tx4[1] == 0x02)
+    ours = [i for i, w in enumerate(p.sent) if w != ht.ack(1)]  # minus the session's auto-ACK
+    assert [p.sent[i] for i in ours] == lead + [ht.hello()]
+    polls = [p.sent_at_poll[i] for i in ours]
+    assert all(b > a for a, b in zip(polls, polls[1:])), "the input is serviced between lead frames"
+    assert [f.family for f in r.frames] == [0x10, 0x00], "frames seen during the lead are kept"
+    assert p.sent.count(ht.ack(1)) == 1  # the unsolicited 0x10 is ACKed exactly once
+
+
+def test_exchange_ack_id_overrides_the_any_ack_rule_for_chunk_frames():
+    chunk = ht.import_stream(0x24, evidence("099-Finger_AC.prst"))[-1]
+    p = FakePedal()
+    s = session(p, **FAST)
+    p.emit(ht.ack(0x05))
+    assert s.exchange(chunk).ack is True  # a chunk frame has no tx: any ACK counts
+    p.emit(ht.ack(0x05))
+    r = s.exchange(chunk, ack_id=0x24, timeout=0.1)
+    assert r.ack is False and r.timeout
+    p.emit(ht.ack(0x24))
+    assert s.exchange(chunk, ack_id=0x24).ack is True
+
+
+def test_exchange_idle_override_waits_longer_after_the_ack():
+    chunk = ht.import_stream(0x24, evidence("099-Finger_AC.prst"))[-1]
+    is_note = lambda f: f.family == ht.FAMILY_IMPORT_DONE  # noqa: E731
+    p = FakePedal()
+    s = session(p, **FAST)  # idle 0.06
+    p.emit(ht.ack(0x24))
+    p.emit(MSG["import_notify_08"], delay=0.15)
+    r = s.exchange(chunk, ack_id=0x24, until=is_note)
+    assert r.ack and not any(is_note(f) for f in r.frames)  # gave up 0.06 s after the ACK
+    s.pump(0.2)  # (the late notify is ACKed by the pump, then dropped)
+    p.emit(ht.ack(0x24))
+    p.emit(MSG["import_notify_08"], delay=0.15)
+    r = s.exchange(chunk, ack_id=0x24, until=is_note, idle=0.5, timeout=1.0)
+    assert r.ack and any(is_note(f) for f in r.frames) and not r.timeout
+
+
 # --- ports ------------------------------------------------------------------------
 
 def test_session_without_ports_opens_them_lazily(monkeypatch):

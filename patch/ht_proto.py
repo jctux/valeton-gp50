@@ -32,6 +32,7 @@ PRESET_LEN = 1128
 PAYLOAD_HEAD_EXPORT = b"\x03\x03\x11\x30"
 PAYLOAD_HEAD_IMPORT = b"\x01\x03\x11\x30"
 IMPORT_BYTE_0A = 0x5C  # the exported file carries 0x58 here; Suite sends 0x5C on import
+IMPORT_DONE_PAYLOAD = b"\x09\x03\x11\x30"  # logical payload of the pedal's 0x08 after an import
 
 
 def crc8_31(data: bytes, init: int = 0) -> int:
@@ -112,6 +113,15 @@ def chunk_fields(f: Frame) -> Tuple[int, int, int, bytes]:
     """(offset, transfer_id, chunk_index, decoded piece) of a chunk frame."""
     offset = (f.tx4[1] & 0x7F) | ((f.tx4[2] & 0x7F) << 7)
     return offset, f.tx4[3], f.body[0], dec(f.body[1:])
+
+
+def short_payload(f: Frame) -> bytes:
+    """The logical payload of a short (non-chunk) message. Body = one flag byte +
+    nibbles(logical): the host sends flag 00; the pedal's captured 0x08 import
+    notification carries 01."""
+    if is_chunk(f) or len(f.body) < 9:
+        raise ValueError("not a short HT message")
+    return parse_logical(dec(f.body[1:]))
 
 
 def short_message(family: int, tx_id: int, payload: bytes) -> bytes:
