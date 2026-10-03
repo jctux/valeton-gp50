@@ -371,6 +371,23 @@ def test_send_acks_unsolicited_frames_once_and_keeps_waiting():
     assert [w for w in p.sent if w[3] == ht.FAMILY_PATCH] == pk
 
 
+def test_send_ignores_an_ack_or_notify_that_arrives_mid_stream():
+    pk = good_stream()
+
+    def extra(pedal, idx):
+        if idx == 3:
+            pedal.emit(ht.ack(0x24))
+            pedal.emit(MSG["import_notify_08"])
+    p = ImportPedal(extra=extra)
+    assert send(pk, p, pace=0.01)["notified"] is True
+    assert [w for w in p.sent if w[3] == ht.FAMILY_PATCH] == pk  # every chunk still went out
+    assert len(p.acks_for(NOTIFY_TX)) == 2  # each 0x08 ACKed once, by the session
+    q = ImportPedal(ack=False, notify=False, extra=extra)
+    with pytest.raises(RuntimeError, match="did not ACK"):
+        send(pk, q, pace=0.01, notify_timeout=0.1)
+    assert [w for w in q.sent if w[3] == ht.FAMILY_PATCH] == pk
+
+
 def test_send_without_notify_raises_after_the_timeout():
     pk = good_stream()
     p = ImportPedal(notify=False)

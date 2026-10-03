@@ -212,7 +212,9 @@ def _send_gp150_stream(port_name, packets, allow_unverified, session, pace, noti
             s.close()
     if r.error is not None:
         raise RuntimeError(f"GP-150 import to slot {slot} failed while sending: {r.error}")
-    notes = [f for f in r.frames if _is_import_done(f)]
+    if any(_is_import_done(f) for f in r.frames[:r.before_last]):
+        s.log("warn", "a 0x08 notification arrived before the import was complete (ignored)")
+    notes = [f for f in r.frames[r.before_last:] if _is_import_done(f)]  # answers to the whole stream only
     if not notes:
         if not r.ack:
             raise RuntimeError(

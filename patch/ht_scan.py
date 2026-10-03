@@ -118,7 +118,7 @@ class Reply:
     """What one exchange saw. Unpacks as (ack, frames). Exactly one outcome is set
     for a stream: payload (+transfer_id) | silent | error | timeout."""
 
-    __slots__ = ("ack", "frames", "chunks", "payload", "transfer_id", "silent", "error", "timeout")
+    __slots__ = ("ack", "frames", "chunks", "payload", "transfer_id", "silent", "error", "timeout", "before_last")
 
     def __init__(self) -> None:
         self.ack = False
@@ -129,6 +129,7 @@ class Reply:
         self.silent = False
         self.error: Optional[Exception] = None
         self.timeout = False
+        self.before_last = 0  # frames that arrived before the last frame went out (exchange(lead=...))
 
     def __iter__(self) -> Iterator:
         return iter((self.ack, self.frames))
@@ -241,9 +242,11 @@ class Session:
         Multi-frame requests (the gated GP-150 import, device_write.send_stream):
         `lead` frames go out first, `pace` s apart, with the input serviced (ACK
         duties, frames collected) in between; `wire` is the last frame and every
-        timer starts when it is sent. `ack_id` names the ACK that counts (default:
-        the request's tx id; any ACK for raw bytes / chunk frames); `idle`
-        overrides how long to wait after that ACK."""
+        timer starts when it is sent. Until then nothing ends the exchange or
+        counts as its ACK (`before_last` = how many of `frames` arrived before the
+        last frame went out). `ack_id` names the ACK that counts (default: the
+        request's tx id; any ACK for raw bytes / chunk frames); `idle` overrides
+        how long to wait after that ACK."""
         timeout = self.timeout if timeout is None else timeout
         idle = self.idle if idle is None else idle
         want = ack_id  # the ACK id that counts; by default the request's tx id
@@ -274,14 +277,14 @@ class Session:
                 if f.family == ht.FAMILY_ACK and not ht.is_chunk(f):
                     if f.tx4[1] != 0:  # `00 0x 03 00` handshake reply: a frame, not an ACK
                         r.frames.append(f)
-                        if not stream and (until is None or until(f)):
+                        if not stream and not queue and (until is None or until(f)):
                             done = True
-                    elif not r.ack and (want is None or f.tx4[3] == want):
+                    elif not r.ack and not queue and (want is None or f.tx4[3] == want):
                         r.ack, ack_at = True, time.monotonic()
                     continue
                 r.frames.append(f)
                 if not ht.is_chunk(f):  # reply / status message
-                    if not stream and (until is None or until(f)):
+                    if not stream and not queue and (until is None or until(f)):
                         done = True
                     continue
                 if not stream:
@@ -309,6 +312,7 @@ class Session:
             if queue:  # still sending the lead: no verdicts yet
                 if now >= next_send_at:
                     if len(queue) == 1:
+                        r.before_last = len(r.frames)
                         t0 = time.monotonic()
                     try:
                         self.send(queue.pop(0))

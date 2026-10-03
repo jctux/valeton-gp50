@@ -240,6 +240,19 @@ const pk199 = WW.buildPatchWriteStream(finger, 199);
   check("write: chunks still contiguous", hex(p.sent.filter((w) => w[3] === HT.FAMILY_PATCH).flatMap((w) => Array.from(w))) === hex(pk199.flat()));
   s.close();
 }
+{ // a stray 0x08 / transfer-id ACK while chunks are still going out: no early finish
+  const p = importPedal({ onChunk: (idx, { deliver }) => { if (idx === 3) { deliver(HT.ack(0x24)); deliver(MSG.import_notify_08); } } });
+  const s = T.create(p.input, p.output, W);
+  const r = await s.writePreset(pk199);
+  check("write: a mid-stream 0x08 does not end the write", r.notified && p.sent.filter((w) => w[3] === HT.FAMILY_PATCH).length === 10, `${p.sent.length}`);
+  check("write: both 0x08s ACKed by the session, once each", p.acksFor(NOTIFY_TX) === 2);
+  s.close();
+  const q = importPedal({ ack: false, notify: false, onChunk: (idx, { deliver }) => { if (idx === 3) { deliver(HT.ack(0x24)); deliver(MSG.import_notify_08); } } });
+  const s2 = T.create(q.input, q.output, SHORT);
+  const r2 = await rejects(s2.writePreset(pk199), /did not ACK/);
+  check("write: only a mid-stream ACK + 0x08 -> still 'did not ACK'", r2.ok && q.sent.filter((w) => w[3] === HT.FAMILY_PATCH).length === 10, r2.why);
+  s2.close();
+}
 { // one request in flight: a hello queued behind the write goes out after it
   const p = importPedal();
   const s = T.create(p.input, p.output, W);

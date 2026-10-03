@@ -91,8 +91,10 @@
     //    chunk arrived emptyTimeoutMs after the ACK (or after the send if no ACK).
     // Multi-frame requests (writePreset): `lead` frames go out first, paceMs apart,
     // with this exchange's handler already listening; `wire` is the last frame and
-    // every timer starts when it is sent. `ackId` names the ACK that counts
-    // (default: the request's tx id; any ACK for raw bytes / chunk frames);
+    // every timer starts when it is sent. Until then nothing ends the exchange or
+    // counts as its ACK (frames are still collected; `beforeLast` = how many of
+    // `frames` arrived before the last frame went out). `ackId` names the ACK that
+    // counts (default: the request's tx id; any ACK for raw bytes / chunk frames);
     // `idleMs` overrides how long to wait after that ACK.
     function exchange(wire, { stream = false, timeoutMs = o.timeoutMs, until = null, lead = [], paceMs = 0, ackId = null, idleMs = o.idleMs } = {}) {
       let want = ackId; // the ACK id that counts; by default the request's tx id
@@ -101,7 +103,7 @@
       }
       return new Promise((resolve) => {
         const frames = [], chunks = [];
-        let t0 = Date.now(), sending = lead.length > 0; // sending: lead frames still going out
+        let t0 = Date.now(), sending = lead.length > 0, beforeLast = 0; // sending: lead frames still going out
         let ack = false, ackAt = 0, lastChunkAt = 0, done = false, tick = null;
         let sawTail = false; // non-zero-offset chunks seen with no offset-0 chunk before them
         const finish = (extra) => {
@@ -109,17 +111,17 @@
           done = true;
           if (current === handler) { current = null; abortCurrent = null; }
           clearInterval(tick);
-          resolve(Object.assign({ ack, frames, chunks }, extra));
+          resolve(Object.assign({ ack, frames, chunks, beforeLast }, extra));
         };
         const handler = (f, w) => {
           if (f.family === HT.FAMILY_ACK && !HT.isChunk(f)) {
             // `00 0x 03 00` handshake replies are not ACKs (an ACK is `00 00 00 <id>`).
-            if (f.tx4[1] !== 0) { frames.push(f); if (!stream && (!until || until(f))) finish(); return; }
-            if (!ack && (want === null || f.tx4[3] === want)) { ack = true; ackAt = Date.now(); }
+            if (f.tx4[1] !== 0) { frames.push(f); if (!stream && !sending && (!until || until(f))) finish(); return; }
+            if (!ack && !sending && (want === null || f.tx4[3] === want)) { ack = true; ackAt = Date.now(); }
             return;
           }
           frames.push(f);
-          if (!HT.isChunk(f)) { if (!stream && (!until || until(f))) finish(); return; } // reply / status message
+          if (!HT.isChunk(f)) { if (!stream && !sending && (!until || until(f))) finish(); return; } // reply / status message
           if (!stream) return;
           // offset 0 opens a stream: drop any partial leftovers (e.g. a resend), and
           // ignore a tail with no head — an older stream's, or ours with its first
@@ -153,7 +155,7 @@
           try {
             for (const w of lead) { if (done) return; send(w); await sleep(paceMs); }
             if (done) return;
-            t0 = Date.now(); sending = false;
+            beforeLast = frames.length; t0 = Date.now(); sending = false;
             send(wire);
           } catch (err) { finish({ error: err }); }
         })();
@@ -304,7 +306,8 @@
         });
         if (r.aborted) throw r.error;
         if (r.error) throw new Error(`GP-150 import to slot ${slot} failed while sending: ${r.error.message}`);
-        const note = r.frames.find(isImportDone);
+        if (r.frames.slice(0, r.beforeLast).some(isImportDone)) log("warn", "a 0x08 notification arrived before the import was complete (ignored)");
+        const note = r.frames.slice(r.beforeLast).find(isImportDone); // only an answer to the whole stream counts
         if (!note) {
           if (!r.ack) throw new Error(`GP-150 did not ACK the import to slot ${slot} (${NOT_RESPONDING}). Read slot ${slot} back before retrying: it may or may not have been written.`);
           throw new Error(`GP-150 ACKed the import to slot ${slot} but sent no 0x08 'import done' within ${w.notifyTimeoutMs} ms — read slot ${slot} back before trusting or retrying the write`);
