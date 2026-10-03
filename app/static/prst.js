@@ -32,6 +32,24 @@
   const GP5 = { key: "gp5", name: "GP-5", header: HEADER_GP5, prstLen: 507, devtag: DEVTAG_GP5, ringFile: "fxid_ring_gp5.json", usbPid: 0x0184, slots: 100, transport: "legacy", nBlocks: 10 };
   const GP150 = { key: "gp150", name: "GP-150", header: HEADER_GP150, prstLen: 1128, devtag: new Uint8Array(0), ringFile: "fxid_ring_gp150.json", usbPid: 0x0186, slots: 200, transport: "ht", nBlocks: 12 };
   const DEVICES = { gp50: GP50, gp5: GP5, gp150: GP150 };
+  // Layout facts patchlib/explorer need, so they don't hard-code the GP-50 chain.
+  const layout = {
+    BLOCK_NAMES: ["NR", "PRE", "DST", "AMP", "CAB", "EQ", "MOD", "DLY", "RVB", "N->S"],
+    MOVABLE_BLOCKS: new Set(["NR", "PRE", "MOD", "DLY", "RVB"]),
+    PARAMS_PER_BLOCK: 8, N_BLOCKS: 10, AMP_INDEX: 3, NS_INDEX: 9, CAB_INDEX: 4,
+    lockedFirst: false, hasFootswitches: true, nsIsRegularBlock: false, emptyName: null, // null -> profile.name
+  };
+  // The codec for a profile: this module for GP-5/GP-50, prst150.js for the GP-150.
+  function codecFor(p) {
+    const key = typeof p === "string" ? p : (p && p.key);
+    if (key === "gp150") {
+      const c = (typeof window !== "undefined" && window.PRST150) || (typeof self !== "undefined" && self.PRST150) || (typeof globalThis !== "undefined" && globalThis.PRST150)
+        || (typeof module !== "undefined" && module.exports ? require("./prst150.js") : null);
+      if (!c) throw new Error("prst150.js is not loaded");
+      return c;
+    }
+    return API;
+  }
   const bodyLen = (p) => p.prstLen - BODY_OFF;
   const profileFor = (key) => { const p = DEVICES[key]; if (!p) throw new Error(`unknown device ${key}`); return p; };
 
@@ -208,7 +226,8 @@
     return tlv(0x0003, payload);
   }
   function checkConvertible(prst, targetKey) {
-    const target = profileFor(targetKey); if (target.key !== "gp5") return [];
+    const target = profileFor(targetKey); if (target.key === "gp150" || detect(prst).key === "gp150") return [];
+    if (target.key !== "gp5") return [];
     const out = [];
     modelRecords(prst).forEach(([idx, cat, fxlow], k) => {
       const fxid = (cat << 24) | fxlow;
@@ -225,6 +244,7 @@
   function convert(prst, targetKey, { force = false } = {}) {
     prst = u8(prst);
     const source = detect(prst), target = profileFor(targetKey);
+    if (source.key === "gp150" || target.key === "gp150") throw new Error("GP-150 presets can't be converted to/from GP-5/GP-50 (different effect catalog)");
     if (source.key === target.key) return prst;
     const problems = checkConvertible(prst, targetKey);
     if (problems.length && !force) {
@@ -352,7 +372,7 @@
 
   const API = {
     NAME_OFF, BODY_OFF, NAME_LEN, CRC_OFF, SETTINGS_OFF, N_BLOCKS, N_PARAM_SLOTS,
-    GP50, GP5, GP150, DEVICES, profileFor, bodyLen,
+    GP50, GP5, GP150, DEVICES, profileFor, bodyLen, layout, codecFor,
     crc8, refixCrc, detect, readName, writeName, rebuild,
     modelsOffset, modelRecords, modelRecOffset, bypassOffset, orderOffset, paramsOffset, bypassMask, paramFloats, fsOffset, findTLV,
     readOrder, writeOrder, isPermutation,

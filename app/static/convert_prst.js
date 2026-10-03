@@ -38,7 +38,7 @@
   let files = []; // File[]
   let inspected = []; // per-file inspect result, index-aligned with `files`
 
-  const DEV = { gp5: "GP-5", gp50: "GP-50" };
+  const DEV = { gp5: "GP-5", gp50: "GP-50", gp150: "GP-150" };
 
   function showError(msg) {
     errEl.textContent = msg;
@@ -82,6 +82,7 @@
           } catch (e) {
             return { name: f.name, ok: false, error: e.message };
           }
+          if (src.key === "gp150") return { name: f.name, ok: false, error: "GP-150 presets are not convertible (different effect catalog)" };
           const tgtKey = targetFor(src.key, target);
           const problems = PRST.checkConvertible(data, tgtKey);
           return {

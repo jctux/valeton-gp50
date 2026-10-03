@@ -25,15 +25,22 @@
   const USER_IR_BASE = 0x100000;
 
   function make(ring, bankMap, profile) {
+    const C = PRST.codecFor(profile), L = C.layout;
+    const BLOCK_NAMES = L.BLOCK_NAMES, MOVABLE_BLOCKS = L.MOVABLE_BLOCKS, STRIDE = L.PARAMS_PER_BLOCK;
     // ring: {fxidInt: entry}; normalize keys to ints for lookup
     const R = {};
     for (const k of Object.keys(ring || {})) R[Number(k)] = ring[k];
     bankMap = bankMap || {};
     const bankSnap = bankMap.snaptone || {};
     const bankIr = bankMap.ir || {};
-    const devName = (profile.name || "").toUpperCase();
+    const devName = (L.emptyName == null ? (profile.name || "") : L.emptyName).toUpperCase();
 
-    const modelEntry = (cat, fxlow) => R[((cat << 24) | fxlow) >>> 0] || null;
+    const modelEntry = (cat, fxlow) => {
+      const e = R[((cat << 24) | fxlow) >>> 0];
+      if (e) return e;
+      // GP-150 fxlow carries subtype/ext bits; ring keys are (slot<<24)|type.
+      return L.nsIsRegularBlock ? (R[((cat << 24) | (fxlow & 0xff)) >>> 0] || null) : null;
+    };
     const modelName = (cat, fxlow) => { const e = modelEntry(cat, fxlow); return e ? (e.name || e.fxtitle) : null; };
 
     // blocks whose catalog spans >1 type (so the type adds info)
@@ -49,7 +56,7 @@
     };
     const cabName = (fxlow) => {
       if (fxlow >= USER_IR_BASE) { const slot = fxlow - USER_IR_BASE; return bankIr[slot] || `User IR ${slot + 1}`; }
-      return modelName(CAB_CAT, fxlow);
+      return modelName(L.nsIsRegularBlock ? L.CAB_INDEX : CAB_CAT, fxlow);
     };
     const round2 = (v) => Math.round((v + Number.EPSILON) * 100) / 100;
     const fmtParam = (v, toggle, unit) => {
@@ -59,7 +66,7 @@
     };
     const paramsFor = (entry, floats, blockIndex) => {
       if (!entry) return [];
-      const base = blockIndex * 8, out = [];
+      const base = blockIndex * STRIDE, out = [];
       for (const p of entry.params || []) {
         const slot = base + p.algId;
         if (slot >= floats.length) continue;
@@ -74,43 +81,49 @@
     };
 
     const footswitches = (b) => {
-      const off = PRST.fsOffset(b);
+      if (!L.hasFootswitches) return [[], []];
+      const off = C.fsOffset(b);
       if (off < 0) return [[], []];
       const d = new DataView(b.buffer, b.byteOffset, b.byteLength);
       const a = d.getUint32(off, true), c = d.getUint32(off + 4, true);
-      const bits = (m) => { const r = []; for (let i = 0; i < 10; i++) if ((m >> i) & 1) r.push(i); return r; };
+      const bits = (m) => { const r = []; for (let i = 0; i < L.N_BLOCKS; i++) if ((m >> i) & 1) r.push(i); return r; };
       return [bits(a), bits(c)];
     };
     const patchSettings = (b) => {
-      const [vol, bpm] = PRST.readVolBpm(b);
+      const [vol, bpm] = C.readVolBpm(b);
       const [fs1, fs2] = footswitches(b);
       return { patch_vol: vol, bpm, fs1, fs2 };
     };
 
     const blocksFor = (b, nsLabel) => {
-      const mask = PRST.bypassMask(b);
-      const recs = PRST.modelRecords(b);
-      const floats = PRST.paramFloats(b);
+      const mask = C.bypassMask(b);
+      const recs = C.modelRecords(b);
+      const floats = C.paramFloats(b);
+      const engines = L.nsIsRegularBlock && C.blocksBySlot ? C.blocksBySlot(b).map((x) => x.engine) : null;
       const out = [];
       BLOCK_NAMES.forEach((block, k) => {
         const [idx, cat, fxlow] = k < recs.length ? recs[k] : [0, 0, 0];
         let e, model, btype, official = null, fxid;
-        if (block === "N->S") {
+        if (engines && engines[k] === 0x06 && block !== "VOL") {
+          // engine 0x06 = the "None"/bypassed effect, whatever the type byte says
+          const nk = ((k << 24) | 3) >>> 0, ne = R[nk];
+          e = null; model = "None"; btype = null; official = null; fxid = ne && ne.name === "None" ? nk : 0;
+        } else if (block === "N->S" && !L.nsIsRegularBlock) {
           e = modelEntry(NS_CAT, idx);
           model = idx ? (nsLabel[idx] || null) : null;
           btype = "SnapTone";
           fxid = idx ? ((NS_CAT << 24) | idx) >>> 0 : 0;
         } else {
           e = modelEntry(cat, fxlow);
-          model = e ? (e.name || e.fxtitle) : null;
+          model = e ? (e.name || e.fxtitle) : (L.nsIsRegularBlock ? `Type ${idx}` : null);
           btype = e ? e.type : null;
           official = e ? (e.origin || null) : null;
-          if (block === "CAB") model = cabName(fxlow) || model;
+          if (block === "CAB" && !L.nsIsRegularBlock) model = cabName(fxlow) || model;
           fxid = (fxlow || cat) ? (((cat << 24) | fxlow) >>> 0) : 0;
         }
         out.push({
           block, active: !!((mask >> k) & 1), type: btype ?? null, model: model ?? null,
-          official: official ?? null, index: idx, fxid, movable: MOVABLE_BLOCKS.has(block),
+          official: official ?? null, index: idx, fxid, type_code: idx, movable: MOVABLE_BLOCKS.has(block),
           label: blockLabel(block, btype, model),
           label_official: blockLabel(block, btype, official || model),
           params: paramsFor(e, floats, k),
@@ -127,19 +140,18 @@
       const raw = {};
       for (const { slot, bytes, name: fallback } of presets) {
         const b = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
-        const recs = PRST.modelRecords(b); // each: [idx, cat, fxlow]
-        const nsIdx = (recs.find(([, cat]) => cat === NS_CAT) || [0, 0, 0])[0];
-        const cab = (recs.find(([, cat]) => cat === CAB_CAT) || [0, 0, 0])[2];
-        const ampRec = recs.find(([, cat]) => AMP_CATS.includes(cat)) || [0, 0x07, 0];
-        const amp = ampRec[2], ampCat = ampRec[1];
-        const name = PRST.readName(b) || fallback || "";
+        const recs = C.modelRecords(b); // each: [idx, cat, fxlow]
+        const nsRec = recs[L.NS_INDEX] || [0, 0, 0], cabRec = recs[L.CAB_INDEX] || [0, 0, 0], ampRec = recs[L.AMP_INDEX] || [0, 0x07, 0];
+        const nsIdx = L.nsIsRegularBlock ? 0 : nsRec[0];
+        const cab = cabRec[2], amp = ampRec[2], ampCat = ampRec[1];
+        const name = C.readName(b) || fallback || "";
         const p = {
           slot, name, empty: isEmptyName(name),
           uses_snaptone: nsIdx !== 0, snaptone_slot: nsIdx,
           ir_slot: cab, amp_slot: amp, snaptone_name: "",
           ir_name: cabName(cab) || `Cab #${cab}`,
           amp_name: modelName(ampCat, amp) || `Amp #${amp}`,
-          blocks: [], settings: patchSettings(b),
+          blocks: [], layout_blocks: L.N_BLOCKS, settings: patchSettings(b),
         };
         patches.push(p);
         raw[slot] = b;
@@ -154,7 +166,7 @@
       for (const p of patches) {
         p.snaptone_name = p.snaptone_slot ? (slotLabel[p.snaptone_slot] || "") : "";
         p.blocks = blocksFor(raw[p.slot], slotLabel);
-        p.order = PRST.readOrder(raw[p.slot]); // chain[pos] = block(record) index
+        p.order = C.readOrder(raw[p.slot]); // chain[pos] = block(record) index
       }
 
       // IR/Cab inventory: full catalog + usage counts
@@ -191,7 +203,7 @@
     }
 
     function modelsForBlock(block, snaptones) {
-      if (block === "N->S") {
+      if (block === "N->S" && !L.nsIsRegularBlock) {
         const nsParams = (modelEntry(NS_CAT, 0) || {}).params || [];
         return (snaptones || []).map((s) => ({
           fxid: ((NS_CAT << 24) | s.slot) >>> 0, name: s.name, official: null, type: "SnapTone",
@@ -210,7 +222,7 @@
       return out;
     }
 
-    return { inventory, facets, modelsForBlock, BLOCK_NAMES };
+    return { inventory, facets, modelsForBlock, BLOCK_NAMES, layout: L };
   }
 
   const API = { make, BLOCK_NAMES };
