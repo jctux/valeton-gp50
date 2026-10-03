@@ -26,7 +26,7 @@ const isPresetReq = (w) => w[3] === 0x0f;
 const FAST = { settleMs: 5, emptyTimeoutMs: 60, timeoutMs: 500, idleMs: 60 };
 // for pedals that do answer: a generous hard cap so CPU contention can't expire a
 // stream between chunk timers (timeoutMs only bounds a stream that keeps flowing)
-const LIVE = { ...FAST, timeoutMs: 5000 };
+const LIVE = { ...FAST, timeoutMs: 5000, idleMs: 1000 };
 
 // A fake pedal: answers hello, answers reads with the captured slot-0 export stream,
 // stays silent (after its ACK) for slot 199, logs every host frame. Knobs:
