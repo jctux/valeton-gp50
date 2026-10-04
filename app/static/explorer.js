@@ -23,10 +23,13 @@
     const d = inventoryDevice, prof = d && window.PRST && window.PRST.DEVICES && window.PRST.DEVICES[d.key];
     return (d && d.slots) || (prof && prof.slots) || 100;
   };
-  const layoutOf = () => window.PRST.codecFor((inventoryDevice && inventoryDevice.key) || "gp50").layout;
+  // The loaded presets' device key: every byte the Explorer builds for them goes
+  // through PRST.codecFor(devKey()) (explorer_edits.js); "gp50" before any inventory.
+  const devKey = () => (inventoryDevice && inventoryDevice.key) || "gp50";
+  const layoutOf = () => window.PRST.codecFor(devKey()).layout;
   const scanDuration = (n = slotCount()) => (n > 100 ? "about 2 minutes" : "about 90 seconds");
   // what "Clear preset" writes: the codec's blank (GP-150: factory "New GEN." with the slot's index)
-  const blankLabel = () => ((inventoryDevice && inventoryDevice.key) === "gp150" ? 'the factory "New GEN." preset' : 'a blank "GP-50" preset');
+  const blankLabel = () => (devKey() === "gp150" ? 'the factory "New GEN." preset' : 'a blank "GP-50" preset');
   let filters = []; // {block, type|null, model|null}
 
   // N->S is the pedal's block name for the SnapTone slot; label it plainly.
@@ -249,6 +252,8 @@
     const e = edits.get(p.slot);
     return e && e.name != null ? e.name : p.name;
   }
+  // Row label: the current name; a nameless empty slot (GP-150 scan) reads "(empty slot)".
+  const rowLabel = (p) => window.ExplorerEdits.rowName(p, curName(p));
   // Current chain order (chain position -> model-record index). Pending reorder wins;
   // falls back to the decoded order, then canonical identity.
   function curOrder(p) {
@@ -563,15 +568,15 @@
       UI.toast("Clear needs Chrome or Edge (WebMIDI).", "err");
       return;
     }
-    const key = (inventoryDevice && inventoryDevice.key) || "gp50";
+    const key = devKey();
     const ok = await UI.confirmDialog(
-      `Clear slot ${p.slot} "${curName(p)}" back to ${blankLabel()}? This overwrites the slot on the pedal and can't be undone from here. Make sure Valeton Suite is closed.`,
+      `Clear slot ${p.slot} "${rowLabel(p)}" back to ${blankLabel()}? This overwrites the slot on the pedal and can't be undone from here. Make sure Valeton Suite is closed.`,
       "Clear preset");
     if (!ok) return;
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
     try {
       if (!DeviceBridge.connected()) { if (note) note.textContent = "Connecting to pedal…"; await DeviceBridge.connect(); }
-      const blank = window.PRST.codecFor(key).blankPrst(key === "gp150" ? p.slot : key);
+      const blank = window.ExplorerEdits.blankFor(key, p.slot); // GP-150: "New GEN." with this slot's index
       if (note) note.textContent = `Clearing slot ${p.slot}…`;
       await withTimeout(
         DeviceBridge.writeSlot(p.slot, blank), 15000,
@@ -720,15 +725,16 @@
     d.className = "preset-detail";
     d.appendChild(buildSaveBar(p)); // actions first — visible without scrolling
 
-    // editable preset name (16-char device limit) — writes with the other edits
+    // editable preset name — writes with the other edits
     const nameRow = document.createElement("div");
     nameRow.className = "name-row";
     const nameLbl = document.createElement("label");
     nameLbl.textContent = "Preset name";
     const nameInput = document.createElement("input");
-    // the device caps patch names at 10 chars (factory names top out at 10)
-    nameInput.type = "text"; nameInput.className = "name-input"; nameInput.maxLength = 10;
-    nameInput.title = "Up to 10 characters (device limit)";
+    // GP-5/GP-50 cap patch names at 10 chars (factory names top out at 10); GP-150 at 13
+    const maxName = window.ExplorerEdits.nameMax(devKey());
+    nameInput.type = "text"; nameInput.className = "name-input"; nameInput.maxLength = maxName;
+    nameInput.title = `Up to ${maxName} characters (device limit)`;
     nameInput.value = curName(p);
     nameInput.setAttribute("aria-label", "Preset name");
     nameInput.addEventListener("input", () => {
@@ -737,7 +743,7 @@
       e.name = v === p.name ? null : v; // unchanged = no edit
       refreshSaveBar(p);
       const hdr = nameInput.closest(".preset-row") && nameInput.closest(".preset-row").querySelector(".preset-name");
-      if (hdr) hdr.textContent = v || p.name; // live-update the header without a re-render
+      if (hdr) hdr.textContent = window.ExplorerEdits.rowName(p, v || p.name); // live-update the header without a re-render
     });
     nameInput.addEventListener("change", () => liveKick(p.slot)); // commit on blur/enter
     nameRow.appendChild(nameLbl); nameRow.appendChild(nameInput);
@@ -955,7 +961,7 @@
 
   function slotName(slot) {
     const p = patches.find((x) => x.slot === slot);
-    return p ? p.name : "(empty)";
+    return p ? window.ExplorerEdits.rowName(p, p.name) : "(empty)";
   }
 
   async function refreshAfterSlotOp() {
@@ -964,14 +970,14 @@
   }
 
   function copyPreset(p) {
-    clipboard = { slot: p.slot, name: p.name };
+    clipboard = { slot: p.slot, name: window.ExplorerEdits.rowName(p, p.name) };
     renderPresets(); // paste buttons appear on other slots
   }
 
   async function pastePreset(target) {
     if (!clipboard) return;
     if (clipboard.slot === target.slot) return;
-    if (!(await UI.confirmDialog(`Overwrite slot ${target.slot} "${target.name}" with "${clipboard.name}" (from slot ${clipboard.slot})? Writes to the pedal. Close Valeton Suite first.`, "Paste"))) return;
+    if (!(await UI.confirmDialog(`Overwrite slot ${target.slot} "${window.ExplorerEdits.rowName(target, target.name)}" with "${clipboard.name}" (from slot ${clipboard.slot})? Writes to the pedal. Close Valeton Suite first.`, "Paste"))) return;
     try {
       const j = await UI.jpost("/api/device/write",
         { patch_slot: clipboard.slot, target_slot: target.slot, confirm: true });
@@ -984,7 +990,7 @@
 
   async function swapPreset(p, otherSlot) {
     if (otherSlot === p.slot) return;
-    if (!(await UI.confirmDialog(`Swap slot ${p.slot} "${p.name}" ⇄ slot ${otherSlot} "${slotName(otherSlot)}"? Non-destructive, but writes both to the pedal. Close Valeton Suite first.`, "Swap"))) return;
+    if (!(await UI.confirmDialog(`Swap slot ${p.slot} "${window.ExplorerEdits.rowName(p, p.name)}" ⇄ slot ${otherSlot} "${slotName(otherSlot)}"? Non-destructive, but writes both to the pedal. Close Valeton Suite first.`, "Swap"))) return;
     try {
       const j = await UI.jpost("/api/device/swap",
         { slot_a: p.slot, slot_b: otherSlot, confirm: true });
@@ -1020,7 +1026,7 @@
     sw.className = "slot-act swap-sel";
     sw.innerHTML = `<option value="">⇄ Swap with…</option>` +
       patches.filter((x) => x.slot !== p.slot)
-        .map((x) => `<option value="${x.slot}">#${x.slot} ${x.name}</option>`).join("");
+        .map((x) => `<option value="${x.slot}">#${x.slot} ${window.ExplorerEdits.rowName(x, x.name)}</option>`).join("");
     sw.addEventListener("click", (ev) => ev.stopPropagation());
     sw.addEventListener("change", () => {
       const other = Number(sw.value);
@@ -1042,7 +1048,7 @@
     const e = getEdit(p.slot);
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
     const ans = await UI.promptDialog(
-      `Write "${p.name}" directly to the pedal. Enter the target slot (0–${slotCount() - 1}) to OVERWRITE. Make sure Valeton Suite is closed.`,
+      `Write "${window.ExplorerEdits.rowName(p, p.name)}" directly to the pedal. Enter the target slot (0–${slotCount() - 1}) to OVERWRITE. Make sure Valeton Suite is closed.`,
       String(p.slot), "Next"
     );
     if (ans === null) return;
@@ -1051,7 +1057,7 @@
       if (note) note.textContent = `Write cancelled: slot must be 0–${slotCount() - 1}.`;
       return;
     }
-    if (!(await UI.confirmDialog(`Overwrite device slot ${target} with "${p.name}"? This writes to the pedal.`, "Overwrite"))) return;
+    if (!(await UI.confirmDialog(`Overwrite device slot ${target} with "${window.ExplorerEdits.rowName(p, p.name)}"? This writes to the pedal.`, "Overwrite"))) return;
     if (note) note.textContent = `Writing to slot ${target}…`;
     try {
       const j = await UI.jpost("/api/device/write", {
@@ -1132,7 +1138,8 @@
     liveBusy = true;
     livePending = false;
     try {
-      const edited = window.PRST.applyEdits(liveBase, editsSpec(slot));
+      // the device's own codec (GP-150: prst150.js) — never the GP-50 one on a GP-150 file
+      const edited = window.ExplorerEdits.buildEditedBytes(liveBase, devKey(), editsSpec(slot));
       liveNote(slot, "Writing to the pedal…");
       await withTimeout(
         DeviceBridge.writeSlot(slot, edited), 15000,
@@ -1194,7 +1201,13 @@
     if (liveTimer) { clearTimeout(liveTimer); liveTimer = null; }
     livePending = false;
     liveNote(slot, "Committing changes to the pedal…");
-    const edited = window.PRST.applyEdits(liveBase, editsSpec(slot)); // ensure the very latest is written
+    let edited;
+    try {
+      edited = window.ExplorerEdits.buildEditedBytes(liveBase, devKey(), editsSpec(slot)); // ensure the very latest is written
+    } catch (e) {
+      liveNote(slot, `Keep failed: ${e.message}`, "err");
+      return;
+    }
     try {
       await withTimeout(DeviceBridge.writeSlot(slot, edited), 15000, "keep timed out (foreground the tab)");
     } catch (e) {
@@ -1361,7 +1374,7 @@
       return false;
     }
     reorderSnapshot = { bytes: all, names: {}, takenAt: Date.now() };
-    const codec = window.PRST.codecFor((inventoryDevice && inventoryDevice.key) || "gp50");
+    const codec = window.PRST.codecFor(devKey());
     for (const slot of slots) reorderSnapshot.names[slot] = codec.readName(all[slot]);
     return true;
   }
@@ -1502,11 +1515,11 @@
     if (!reorderSnapshot) return;
     const presets = Object.keys(reorderSnapshot.bytes).map(Number).sort((a, z) => a - z)
       .map((slot) => ({ slot, name: reorderSnapshot.names[slot], b64: bytesToB64(reorderSnapshot.bytes[slot]) }));
-    const doc = { device: (inventoryDevice && inventoryDevice.key) || "gp50", takenAt: reorderSnapshot.takenAt, presets };
+    const doc = { device: devKey(), takenAt: reorderSnapshot.takenAt, presets };
     const blob = new Blob([JSON.stringify(doc)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `${(inventoryDevice && inventoryDevice.key) || "gp50"}_bank_backup.json`;
+    a.href = url; a.download = `${devKey()}_bank_backup.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 4000);
     UI.toast(`Saved a bank backup (all ${slotCount()} presets).`, "ok");
@@ -1520,8 +1533,14 @@
     const writes = planReorder(reorderSnapshot.bytes, order);
     if (!writes.length) { UI.toast("No changes to write — the pedal already matches this order.", "ok"); finishReorder(); render(); return; }
     const est = fmtDur(writes.length * REORDER_WRITE_MS);
+    // GP-150: a slot that was silent in the snapshot is a nameless blank — say which
+    // writes copy one, so no blank lands on the pedal unseen
+    const blanks = window.ExplorerEdits.emptySourceWrites(writes, reorderSnapshot.names, devKey());
+    const blankNote = blanks.length
+      ? ` ${blanks.length} of them cop${blanks.length > 1 ? "y" : "ies"} an EMPTY slot (${blanks.map((w) => `#${w.from} → #${w.slot}`).join(", ")}): nothing was read there during the snapshot, so ${blanks.length > 1 ? "those slots get" : "that slot gets"} a nameless factory blank. If the pedal does hold a preset in ${blanks.length > 1 ? "those source slots" : "that source slot"}, cancel and rescan.`
+      : "";
     const ok = await UI.confirmDialog(
-      `Write ${writes.length} preset${writes.length > 1 ? "s" : ""} to the pedal to apply the new order? This takes about ${est}. Keep this tab in the foreground and don't unplug the pedal until it finishes. Make sure Valeton Suite is closed.`,
+      `Write ${writes.length} preset${writes.length > 1 ? "s" : ""} to the pedal to apply the new order? This takes about ${est}.${blankNote} Keep this tab in the foreground and don't unplug the pedal until it finishes. Make sure Valeton Suite is closed.`,
       `Write ${writes.length} presets`);
     if (!ok) return;
     await runReorderWrites(writes);
@@ -1630,7 +1649,7 @@
       const head = document.createElement("div");
       head.className = "preset-head";
       head.innerHTML =
-        `<span class="preset-num">#${p.slot}</span> <span class="preset-name">${curName(p).replace(/</g, "&lt;")}</span>` +
+        `<span class="preset-num">#${p.slot}</span> <span class="preset-name">${rowLabel(p).replace(/</g, "&lt;")}</span>` +
         (isActive ? ' <span class="badge active-badge">● Active on pedal</span>' : "") +
         (p.uses_snaptone ? ' <span class="badge st">SnapTone</span>' : "");
       // reorder grip (left of the slot number) → drag the row to a new slot
@@ -1696,7 +1715,7 @@
       grip.title = "Drag to a new slot";
       head.appendChild(grip);
       head.insertAdjacentHTML("beforeend",
-        `<span class="preset-num">#${dest}</span> <span class="preset-name">${curName(p).replace(/</g, "&lt;")}</span>` +
+        `<span class="preset-num">#${dest}</span> <span class="preset-name">${rowLabel(p).replace(/</g, "&lt;")}</span>` +
         (slot !== dest ? ` <span class="reorder-orig">was #${slot}</span>` : ""));
       const chips = document.createElement("div");
       chips.className = "chip-row";

@@ -147,6 +147,16 @@
   const invalidate = () => { invCache = null; };
   const deviceObj = () => ({ key: store.profile.key, name: store.profile.name, usb_pid: store.profile.usbPid, prst_len: store.profile.prstLen, slots: store.profile.slots });
   const slotOk = (slot) => Number.isInteger(slot) && slot >= 0 && slot < store.profile.slots;
+  // The bytes a write to `slot` leaves in that slot. A GP-150 preset carries its slot in
+  // index byte 0x04 (the import takes the slot from it; webmidi_write sets it on a copy),
+  // so the cache gets that copy, never the source slot's index. GP-5/GP-50 files carry
+  // no slot (the codec has no writeIndex): the same bytes, as before.
+  function asWritten(prst, slot) {
+    if (!store.codec.writeIndex) return prst;
+    const b = Uint8Array.from(prst);
+    store.codec.writeIndex(b, slot);
+    return b;
+  }
 
   // --- device I/O helpers (WebMIDI) ------------------------------------------
   // Connected => the store matches the connected pedal (GP-150 store for a GP-150,
@@ -287,10 +297,11 @@
     if (!slotOk(body.target_slot)) return J({ ok: false, error: `target_slot 0..${store.profile.slots - 1} required` });
     if (!(await ensureConnected())) return J({ ok: false, error: "no device connected" });
     try {
-      const r = await Bridge.writeSlot(body.target_slot, prst);
-      store.bytes.set(body.target_slot, prst); store.names.set(body.target_slot, store.codec.readName(prst)); invalidate();
+      const sent = asWritten(prst, body.target_slot);
+      const r = await Bridge.writeSlot(body.target_slot, sent);
+      store.bytes.set(body.target_slot, sent); store.names.set(body.target_slot, store.codec.readName(sent)); invalidate();
       persistSlot(body.target_slot);
-      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(prst) });
+      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(sent) });
     } catch (e) { return J({ ok: false, error: e.message }); }
   }
 
@@ -308,10 +319,11 @@
     if (!slotOk(target)) return J({ ok: false, error: `target_slot 0..${store.profile.slots - 1} required` });
     const prst = hasEdits ? store.codec.applyEdits(base, editsFrom(body)) : base;
     try {
-      const r = await Bridge.writeSlot(target, prst);
-      store.bytes.set(target, prst); store.names.set(target, store.codec.readName(prst)); invalidate();
+      const sent = asWritten(prst, target);
+      const r = await Bridge.writeSlot(target, sent);
+      store.bytes.set(target, sent); store.names.set(target, store.codec.readName(sent)); invalidate();
       persistSlot(target);
-      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(prst) });
+      return J({ ok: true, acks: r.acks, packets: r.sent, verified_name: store.codec.readName(sent) });
     } catch (e) { return J({ ok: false, error: e.message }); }
   }
 
@@ -321,9 +333,10 @@
     const ba = store.bytes.get(a), bz = store.bytes.get(z);
     if (!ba || !bz) return J({ ok: false, error: "unknown slot" });
     try {
-      await Bridge.writeSlot(z, ba);
-      await Bridge.writeSlot(a, bz);
-      store.bytes.set(z, ba); store.bytes.set(a, bz);
+      const toZ = asWritten(ba, z), toA = asWritten(bz, a);
+      await Bridge.writeSlot(z, toZ);
+      await Bridge.writeSlot(a, toA);
+      store.bytes.set(z, toZ); store.bytes.set(a, toA);
       const na = store.names.get(a), nz = store.names.get(z);
       store.names.set(a, nz); store.names.set(z, na); invalidate();
       persistSlot(a); persistSlot(z);
@@ -482,11 +495,13 @@
     return realFetch(input, init);
   };
 
-  // Push exact bytes into the cache (used by the Explorer after a live commit/restore
-  // so the row reflects them — incl. a rename — without a slow, name-losing re-read).
+  // Push exact bytes into the cache (used by the Explorer after a live commit/restore,
+  // a clear or a preset reorder, so the row reflects them — incl. a rename — without a
+  // slow, name-losing re-read). A GP-150 preset is filed with this slot's index byte,
+  // as the write left it on the pedal (asWritten).
   function setSlotBytes(slot, prst) {
     if (!store) return;
-    const u = prst instanceof Uint8Array ? prst : Uint8Array.from(prst);
+    const u = asWritten(prst instanceof Uint8Array ? prst : Uint8Array.from(prst), slot);
     store.bytes.set(slot, u); store.names.set(slot, store.codec.readName(u)); invalidate();
     persistSlot(slot);
   }

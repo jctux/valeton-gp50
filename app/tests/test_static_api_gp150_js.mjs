@@ -19,8 +19,9 @@ const data = { "presets.json": read("app/static/data/presets.json"), "fxid_ring.
 globalThis.fetch = async (url) => { const f = String(url).split("/").pop(); return { ok: f in data, json: async () => JSON.parse(data[f]) }; };
 globalThis.PRST = require(resolve(root, "app/static/prst.js")); globalThis.PRST150 = require(resolve(root, "app/static/prst150.js"));
 globalThis.PatchLib = require(resolve(root, "app/static/patchlib.js"));
-let connectedKey = null; const reads = []; let readImpl = null; let corrupt = 0;
-globalThis.DeviceBridge = { webmidiAvailable: () => true, connected: () => !!connectedKey, device: () => ({ key: connectedKey, name: connectedKey === "gp150" ? "GP-150" : "GP-50" }), connect: async () => {}, readNames: async () => [], readSlotOrNull: async (slot) => { reads.push(slot); if (readImpl) return readImpl(slot); return slot === 199 ? null : b; }, readSlotPrst: async () => b, selectSlot: async () => {}, stats: () => ({ corruptFrames: corrupt }) };
+let connectedKey = null; const reads = []; let readImpl = null; let corrupt = 0; const writes = [];
+globalThis.DeviceBridge = { webmidiAvailable: () => true, connected: () => !!connectedKey, device: () => ({ key: connectedKey, name: connectedKey === "gp150" ? "GP-150" : "GP-50" }), connect: async () => {}, readNames: async () => [], readSlotOrNull: async (slot) => { reads.push(slot); if (readImpl) return readImpl(slot); return slot === 199 ? null : b; }, readSlotPrst: async () => b, selectSlot: async () => {}, stats: () => ({ corruptFrames: corrupt }),
+  writeSlot: async (slot, prst) => { writes.push({ slot, prst: Uint8Array.from(prst) }); return { sent: 10, acks: 1, notified: true }; } };
 const apiPath = resolve(root, "app/static/static_api.js");
 require(apiPath);
 let api = globalThis.__staticApi;
@@ -125,5 +126,71 @@ await api.handle("POST", "/api/device/scan", {});
 const sc3 = await waitScan();
 check("3 straight read failures abort the scan", sc3.errors === 3 && sc3.done === 3 && /not responding/.test(sc3.error || ""), JSON.stringify(sc3));
 readImpl = null;
+
+// --- the cache holds the bytes a write ACTUALLY leaves in the target slot -----------------
+// A GP-150 preset carries its slot in index byte 0x04, which the import sets on a copy
+// (webmidi_write buildGp150WriteStream): the cache must hold that copy, never the
+// source slot's index. GP-5/GP-50 files carry no slot: cached as-is, as before.
+{
+  const hex = (u) => Buffer.from(u).toString("hex");
+  const C = globalThis.PRST150;
+  const withIndex = (u, i) => { const z = Uint8Array.from(u); z[4] = i; return z; };
+  const lsSlot = (slot) => { const c = JSON.parse(store["valeton_scanCache_v2"]); return c.slots[slot] ? new Uint8Array(Buffer.from(c.slots[slot].b64, "base64")) : null; };
+  connectedKey = "gp150"; await get("/api/device/status");
+  check("cache-sent: on the gp150 store", (await get("/api/device/inventory")).device.key === "gp150");
+  const all = () => api.getAllSlotBytes();
+  const src5 = all()[5];
+  check("cache-sent: fixture slot 5 carries index 0 (the fake pedal returns slot 0's bytes)", src5[4] === 0);
+
+  // write (no edits): slot 5 -> 12
+  writes.length = 0;
+  let r = await (await api.handle("POST", "/api/device/write", { patch_slot: 5, target_slot: 12, confirm: true })).json();
+  check("write: ok", r.ok === true, JSON.stringify(r));
+  check("write: the bridge got index 12", writes.length === 1 && writes[0].slot === 12 && writes[0].prst[4] === 12);
+  check("write: cached slot 12 == the bytes sent", hex(all()[12]) === hex(writes[0].prst) && hex(all()[12]) === hex(withIndex(src5, 12)));
+  check("write: persisted with index 12", lsSlot(12) && hex(lsSlot(12)) === hex(withIndex(src5, 12)));
+  check("write: the source slot is untouched", hex(all()[5]) === hex(src5));
+
+  // write with edits: rename + param, slot 5 -> 13
+  writes.length = 0;
+  r = await (await api.handle("POST", "/api/device/write", { patch_slot: 5, target_slot: 13, confirm: true, name: "Edited", params: { 5: { 0: 33 } } })).json();
+  const want13 = withIndex(C.applyEdits(src5, { name: "Edited", params: { 5: { 0: 33 } } }), 13);
+  check("write+edits: ok, verified name", r.ok === true && r.verified_name === "Edited", JSON.stringify(r));
+  check("write+edits: sent == cached == applyEdits + index 13", writes.length === 1 && hex(writes[0].prst) === hex(want13) && hex(all()[13]) === hex(want13));
+  check("write+edits: inventory shows the new name at 13", (await get("/api/device/inventory")).patches.find((p) => p.slot === 13).name === "Edited");
+
+  // swap 12 <-> 199 (199 is the scan's nameless blank)
+  const a12 = all()[12], z199 = all()[199];
+  writes.length = 0;
+  r = await (await api.handle("POST", "/api/device/swap", { slot_a: 12, slot_b: 199, confirm: true })).json();
+  check("swap: ok", r.ok === true, JSON.stringify(r));
+  check("swap: sent index 199 then 12", writes.length === 2 && writes[0].slot === 199 && writes[0].prst[4] === 199 && writes[1].slot === 12 && writes[1].prst[4] === 12);
+  check("swap: cached 199 == sent (slot 12's preset, index 199)", hex(all()[199]) === hex(writes[0].prst) && hex(all()[199]) === hex(withIndex(a12, 199)));
+  check("swap: cached 12 == sent (the blank, index 12)", hex(all()[12]) === hex(writes[1].prst) && hex(all()[12]) === hex(withIndex(z199, 12)));
+  const inv2 = await get("/api/device/inventory");
+  check("swap: names follow the presets", inv2.patches.find((p) => p.slot === 12).empty === true && inv2.patches.find((p) => p.slot === 199).name === "New GEN.");
+
+  // setSlotBytes (Explorer: reorder commit, live keep/restore, clear) files the slot's index
+  api.setSlotBytes(42, src5);
+  check("setSlotBytes: index normalized to the slot", all()[42][4] === 42 && hex(all()[42]) === hex(withIndex(src5, 42)) && hex(lsSlot(42)) === hex(withIndex(src5, 42)));
+
+  // build: a GP-150 preset has no N->S SnapTone record to repoint -> refused, nothing sent
+  writes.length = 0;
+  await api.handle("POST", "/api/device/templates/from-patch", { name: "T", source_slot: 5 });
+  const tpl = (await get("/api/device/templates")).templates.find((t) => t.name === "T");
+  const rb = await api.handle("POST", "/api/device/build", { template_id: tpl.id, snaptone_slot: 50, target_slot: 14, confirm: true });
+  check("build gp150: refused before any write", rb.status === 400 && writes.length === 0, `${rb.status} ${writes.length}`);
+
+  // GP-50: the bytes are cached exactly as sent (no index byte), as before
+  connectedKey = "gp50"; await get("/api/device/status");
+  check("gp50: back on the bundle store", (await get("/api/device/inventory")).device.key === "gp50");
+  const g1 = all()[1];
+  writes.length = 0;
+  r = await (await api.handle("POST", "/api/device/write", { patch_slot: 1, target_slot: 7, confirm: true })).json();
+  check("gp50 write: source bytes sent and cached unchanged", r.ok && writes.length === 1 && hex(writes[0].prst) === hex(g1) && hex(all()[7]) === hex(g1));
+  api.setSlotBytes(8, g1);
+  check("gp50 setSlotBytes: bytes unchanged", hex(all()[8]) === hex(g1));
+  connectedKey = "gp150"; await get("/api/device/status");
+}
 
 console.log(`static_api gp150: ${pass} passed, ${fail} failed`); for (const f of fails) console.log("  FAIL " + f); process.exit(fail ? 1 : 0);

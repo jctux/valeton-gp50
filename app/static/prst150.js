@@ -22,6 +22,7 @@
     BLOCK_NAMES: SLOTS.slice(), MOVABLE_BLOCKS: new Set(SLOTS.filter((s) => s !== "AMP")),
     PARAMS_PER_BLOCK: N_PARAMS, N_BLOCKS, AMP_INDEX: AMP_SLOT, NS_INDEX: 4, CAB_INDEX: 6,
     lockedFirst: true, hasFootswitches: false, nsIsRegularBlock: true, emptyName: "",
+    nameMax: 13, // editor cap (spec §3.2); the file holds up to 67 bytes
   };
 
   const u8 = (b) => (b instanceof Uint8Array ? b : Uint8Array.from(b));
