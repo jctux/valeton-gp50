@@ -84,6 +84,8 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
 Evidence files: `re/gp150/evidence/` (probe logs, read presets), `re/gp150/probes/`
 (the throwaway probe scripts that produced them).
 
+> **Session open (verified 2026-10-04).** After a power cycle the GP-150 ACKs preset reads but streams nothing until the host sends the Suite's family-0x0C message `F0 7F 25 0C 00 00 00 00 00 01 05 03 00 08 00 00 00 03 00 01 07 00 01 00 07 00 01 00 00 02 00 00 F7` (short message, tx 0, payload `03 01 70 10 70 10 02 00`) right after the handshake. The pedal answers with an ACK (tx 0) and an ident reply (family 0x10, tx 1) that the host ACKs. `hello()` = handshake + session open in both sessions.
+
 ## 3. Architecture
 
 Approach: GP-150 becomes a third `DeviceProfile` with its **own codec module and own

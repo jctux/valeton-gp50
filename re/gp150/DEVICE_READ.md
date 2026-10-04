@@ -144,3 +144,12 @@ Setup: GP-150 on USB, Valeton Suite **closed**, `.venv-midi` present (see above)
   `empty_unacked` in `scan_summary.json`). Answer: _(fill in)_
 - **(b) Is preset byte 0x04 always the slot index?** (Seen on slots 0 and 99 only.)
   Read it off step 3b: `index byte 0x04 == slot for N/N presets`, plus any mismatches. Answer: _(fill in)_
+
+
+## Session 2026-10-04 (USB, Valeton Suite closed, firmware: _(fill in)_)
+
+- **Finding:** right after a power cycle, every read (all 200 slots and ACTIVE) came back "empty (ACK, then silence)". Sending the Suite's family-0x0C session-open after the handshake (and ACKing the ident reply, family 0x10 tx 1) fixed it at once. `hello()` now does this in both the Python and the JS session (commits 3f0e50c, 0b7e48e).
+- **(a) Does an empty-slot read get an ACK?** Yes. First scan (pre-fix, every slot read as empty): `200 ACKed, 0 un-ACKed`, ~1.81 s per empty slot.
+- `read active` after the fix: `index=100 name='Nothin-GT1'`; `read 0`: `index=0 name='New GEN.'`.
+- Full scan after the fix: _(fill in from device_scan_gp150/scan.log `done:` line)_
+- **(b) index byte 0x04 == slot:** _(fill in from the scan's "index byte" line)_
