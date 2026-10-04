@@ -235,6 +235,13 @@ for (const name of EVID) {
   const g50order = [8, 0, 1, 2, 9, 3, 4, 5, 6, 7];
   check("pin: GP-50 layout untouched", JSON.stringify(X.pinChainEnds(g50order, L50)) === JSON.stringify(g50order) && L50.lockedLast !== true);
   check("patchlib: VOL is not movable on the GP-150", lib.inventory([{ slot: 0, bytes: evidence("000-New_GEN.prst") }]).patches[0].blocks[11].movable === false);
+  // a preset row shows its blocks in chain order (order table), read from home records
+  const rp = lib.inventory([{ slot: 199, bytes: evidence("199-reordered-by-pedal.prst") }]).patches[0];
+  const names = X.chainBlocks(rp, rp.order, L150).map((b) => b.block).join();
+  check("chainBlocks gp150: chain order of the pedal-reordered preset", names === "AMP,NR,PRE,WAH,DST,N->S,RVB,CAB,EQ,MOD,DLY,VOL", names);
+  check("chainBlocks gp150: a pending order wins", X.chainBlocks(rp, [5, 9, 0, 1, 2, 3, 4, 10, 6, 7, 8, 11], L150)[1].model === "Sweet Echo");
+  const g50 = { blocks: [{ block: "NR" }, { block: "PRE" }], order: [1, 0] };
+  check("chainBlocks gp50: blocks as before (record order)", X.chainBlocks(g50, g50.order, L50).map((b) => b.block).join() === "NR,PRE");
 }
 
 // --- 5. explorer.js / explorer.html are wired to the helpers -------------------------------
@@ -249,6 +256,7 @@ for (const name of EVID) {
   check("explorer.js: clear uses blankFor", /ExplorerEdits\.blankFor\(key, p\.slot\)/.test(js));
   check("explorer.js: reorder confirm names empty sources", /ExplorerEdits\.emptySourceWrites\(/.test(js));
   check("explorer.js: strip built from chainStripParts", /ExplorerEdits\.chainStripParts\(order, L\)/.test(js));
+  check("explorer.js: row chips in chain order (chainBlocks)", (js.match(/ExplorerEdits\.chainBlocks\(p, curOrder\(p\), layoutOf\(\)\)/g) || []).length === 2);
   check("explorer.js: dropped order pinned (AMP first, VOL last)", /setChainOrder\(p, window\.ExplorerEdits\.pinChainEnds\(chainOrderFromDom\(strip\), layoutOf\(\)\)\)/.test(js));
   check("explorer.js: setChainOrder refuses VOL not last", /L\.lockedLast && order\[n - 1\] !== L\.VOL_INDEX/.test(js));
   check("explorer.js: a drop past the end lands before the VOL tail", /\.chain-tail/.test(js));

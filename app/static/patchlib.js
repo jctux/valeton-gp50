@@ -99,7 +99,10 @@
       const mask = C.bypassMask(b);
       const recs = C.modelRecords(b);
       const floats = C.paramFloats(b);
-      const engines = L.nsIsRegularBlock && C.blocksBySlot ? C.blocksBySlot(b).map((x) => x.engine) : null;
+      // GP-150: blocks[k] is slot k read from its home record (records never move);
+      // `pos` = its chain position from the order table (p.order[pos] === k).
+      const slotBlocks = L.nsIsRegularBlock && C.blocksBySlot ? C.blocksBySlot(b) : null;
+      const engines = slotBlocks ? slotBlocks.map((x) => x.engine) : null;
       const out = [];
       BLOCK_NAMES.forEach((block, k) => {
         const [idx, cat, fxlow] = k < recs.length ? recs[k] : [0, 0, 0];
@@ -121,13 +124,15 @@
           if (block === "CAB" && !L.nsIsRegularBlock) model = cabName(fxlow) || model;
           fxid = (fxlow || cat) ? (((cat << 24) | fxlow) >>> 0) : 0;
         }
-        out.push({
+        const blk = {
           block, active: !!((mask >> k) & 1), type: btype ?? null, model: model ?? null,
           official: official ?? null, index: idx, fxid, type_code: idx, movable: MOVABLE_BLOCKS.has(block),
           label: blockLabel(block, btype, model),
           label_official: blockLabel(block, btype, official || model),
           params: paramsFor(e, floats, k),
-        });
+        };
+        if (slotBlocks) blk.pos = slotBlocks[k].pos;
+        out.push(blk);
       });
       return out;
     };

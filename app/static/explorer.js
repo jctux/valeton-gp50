@@ -1694,7 +1694,7 @@
       // shows every block, active or not.
       const chips = document.createElement("div");
       chips.className = "chip-row";
-      const chain = p.blocks.filter((b) => b.model);
+      const chain = window.ExplorerEdits.chainBlocks(p, curOrder(p), layoutOf()).filter((b) => b.model);
       const engaged = chain.filter((b) => b.active);
       engaged.forEach((b) => chips.appendChild(chip(b)));
       if (!chain.length)
@@ -1740,7 +1740,7 @@
         (slot !== dest ? ` <span class="reorder-orig">was #${slot}</span>` : ""));
       const chips = document.createElement("div");
       chips.className = "chip-row";
-      const chain = p.blocks.filter((b) => b.model);
+      const chain = window.ExplorerEdits.chainBlocks(p, curOrder(p), layoutOf()).filter((b) => b.model);
       chain.forEach((b) => chips.appendChild(chip(b)));
       if (!chain.length) chips.innerHTML = '<span class="subtitle">empty preset</span>';
       head.appendChild(chips);

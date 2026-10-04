@@ -556,10 +556,11 @@ def test_cli_read_and_scan(tmp_path, monkeypatch, capsys):
 
 
 def test_watch_prints_byte_diffs():
-    a = bytearray(CORPUS_PRST)
-    b = bytearray(CORPUS_PRST)
-    pos = 3  # chain position 3 holds slot order[3]
-    off = f150.BLOCKS_OFF + pos * f150.BLOCK_LEN + 4  # the block's type byte
+    # the pedal-reordered preset: RVB (record 10) sits at chain position 6
+    a = bytearray(evidence("199-reordered-by-pedal.prst"))
+    b = bytearray(a)
+    rec = 10  # block records never move: record 10 is RVB whatever the order table says
+    off = f150.BLOCKS_OFF + rec * f150.BLOCK_LEN + 4  # the block's type byte
     b[off] ^= 0x01
     answers = [bytes(a), bytes(b)]
 
@@ -572,8 +573,7 @@ def test_watch_prints_byte_diffs():
     ht_scan.watch(s, interval=0, count=2, printer=lines.append)
     changed = [ln for ln in lines if "bytes changed" in ln]
     assert len(changed) == 1 and changed[0].split()[1] == "1"
-    slot_name = f150.SLOTS[f150.read_order(a)[pos]]
-    assert any(f"pos {pos} ({slot_name}) block byte +0x04" in ln for ln in lines), lines
+    assert any("record 10 (RVB, chain pos 6) byte +0x04 (type 3 -> 2)" in ln for ln in lines), lines
 
 
 

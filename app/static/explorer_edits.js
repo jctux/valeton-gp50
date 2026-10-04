@@ -64,6 +64,14 @@
     return [...head, ...middle, ...tail];
   }
 
+  // A preset's blocks in chain order, for display. GP-150 (pinned-ends layout): blocks[k]
+  // is slot k read from its home record (records never move) and `order` (chain position
+  // -> slot) gives the chain. GP-5/GP-50: p.blocks as before.
+  function chainBlocks(p, order, layout) {
+    if (!layout.lockedFirst || !order || order.length !== p.blocks.length) return p.blocks.slice();
+    return order.map((k) => p.blocks[k]).filter(Boolean);
+  }
+
   // Longest preset name the editor allows: the codec layout's nameMax (GP-150: 13,
   // spec §3.2); GP-5/GP-50: 10 (factory names top out at 10).
   const nameMax = (key) => codecOf(key).layout.nameMax || 10;
@@ -87,7 +95,7 @@
     return writes.filter((w) => !String(names[w.from] || "").trim());
   }
 
-  const API = { buildEditedBytes, nameMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, EMPTY_LABEL };
+  const API = { buildEditedBytes, nameMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, chainBlocks, EMPTY_LABEL };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.ExplorerEdits = API;
 })(typeof self !== "undefined" ? self : this);

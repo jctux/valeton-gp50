@@ -510,7 +510,8 @@ def scan(session: Session, slots: Optional[Iterable[int]] = None, out_dir: str =
 def watch(session: Session, interval: float = 2.0, count: Optional[int] = None,
           printer: Callable[[str], None] = print) -> None:
     """Re-read the active preset every `interval` s and print what changed; block
-    bytes are named by chain position and slot (+0x04 = the model type code)."""
+    bytes are named by record, its slot (records sit at fixed home indexes) and the
+    slot's chain position (+0x04 = the model type code)."""
     printer("watching the active preset — change something on the pedal; Ctrl-C to stop")
     last: Optional[bytes] = None
     n = 0
@@ -525,10 +526,11 @@ def watch(session: Session, interval: float = 2.0, count: Optional[int] = None,
             order = f150.read_order(p)
             for i in diffs:
                 if f150.BLOCKS_OFF <= i < f150.FOOTER_OFF:
-                    pos, off = divmod(i - f150.BLOCKS_OFF, f150.BLOCK_LEN)
-                    slot = f150.SLOTS[order[pos]] if order[pos] < len(f150.SLOTS) else f"slot {order[pos]}"
+                    rec, off = divmod(i - f150.BLOCKS_OFF, f150.BLOCK_LEN)
+                    slot = f150.DEFAULT_ORDER[rec]  # record rec always holds this slot
+                    pos = order.index(slot) if slot in order else "?"
                     what = f" (type {last[i]} -> {p[i]})" if off == 4 else ""
-                    printer(f"   pos {pos} ({slot}) block byte +{off:#04x}{what}")
+                    printer(f"   record {rec} ({f150.SLOTS[slot]}, chain pos {pos}) byte +{off:#04x}{what}")
         if p:
             last = p
         if count is None or n < count:
