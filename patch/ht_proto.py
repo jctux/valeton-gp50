@@ -218,6 +218,6 @@ def chunk_frames(family: int, transfer_id: int, data: bytes, host: bool = True) 
 
 def import_stream(transfer_id: int, prst: bytes) -> List[bytes]:
     """The Suite's patch-import stream for writing `prst` to the slot named by its
-    own index byte (prst[4]). NOT verified on a GP-150 yet — gated by
-    device_write.WRITE_VERIFIED['gp150']."""
+    own index byte (prst[4]). Verified on a GP-150 on 2026-10-04
+    (re/gp150/DEVICE_WRITE.md); still gated by device_write.WRITE_VERIFIED['gp150']."""
     return chunk_frames(FAMILY_PATCH, transfer_id, logical(import_payload(prst)), host=True)

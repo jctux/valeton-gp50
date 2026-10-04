@@ -6,7 +6,10 @@
     python3 scripts/gp150_engines.py --check [DIR]   # exit 1 if the committed table differs
 
 Default corpus: device_scan_gp150/ (the user's full scan, not committed) +
-re/gp150/evidence/; byte-identical files are counted once.
+re/gp150/evidence/; byte-identical files are counted once. The committed table was
+learned from the maintainer's full 200-slot scan + the evidence (203 distinct files),
+so `--check` against re/gp150/evidence alone reports DIFFERS: to regenerate the table,
+rescan your own pedal first (patch/ht_scan.py scan writes device_scan_gp150/).
 
 The browser codec has its own copy of this table, ENGINES in app/static/prst150.js,
 synced BY HAND: after this script rewrites patch/gp150_engines.json, copy the table
@@ -22,9 +25,14 @@ counted as a real engine; VOL's own "Volume" carries 0x06.
 Table, per slot:
   engines[type] = the most common engine of that (slot, type) in the corpus
                   (a tie goes to the slot's most common real engine, then the lower value)
-  default       = the slot's most common real engine, used for a type never seen;
+  default       = the slot's most common real engine;
                   null when no preset in the corpus holds a real effect there (WAH)
-  counts[type]  = {engine: number of blocks}, for the record
+  counts[type]  = {engine: number of blocks}
+
+The codecs pick by the counts only (prst150_format.pick_allowed): a model pick is
+allowed when its (slot, type) shows ONE engine, or the slot shows one engine for every
+seen type (an unseen type then takes it; never N->S, whose SnapTone kinds differ).
+Anything else is refused rather than guessed: a wrong engine silences the preset.
 """
 import argparse
 import collections

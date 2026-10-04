@@ -104,8 +104,13 @@ The engine byte per (slot, type) comes from `patch/gp150_engines.json`, learned 
 `python3 scripts/gp150_engines.py` (`--check` compares). The browser codec carries its own copy,
 `ENGINES` in `app/static/prst150.js`, which is synced **by hand**: after the script rewrites the
 JSON, copy the table into `ENGINES` (`app/tests/test_prst150_js.mjs` fails until the two match).
-No preset read so far has a real wah, so the editor refuses a WAH model pick: set one on the
-pedal, save, rescan, rerun the script, and update `ENGINES`.
+The committed table was learned from the maintainer's full 200-slot scan + the evidence (203
+distinct files); the scan isn't committed, so `--check` against `re/gp150/evidence/` alone differs,
+and a contributor regenerates it from a rescan of their own pedal. A model pick is allowed only when
+the engine is unambiguous (one engine for the (slot, type), or one for every seen type in the slot:
+NR, EQ, DLY, RVB, VOL); the editor refuses the rest (every WAH, most AMP models, a few PRE, DST,
+N→S, CAB and MOD ones): set the model on the pedal, save, rescan, rerun the script, and update
+`ENGINES`.
 
 ### Type codes
 

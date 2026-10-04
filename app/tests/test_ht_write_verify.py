@@ -330,7 +330,7 @@ def test_all_six_steps_pass_with_exactly_one_ack_per_0x08(monkeypatch, midi_port
     assert "New GEN." in results[5][2]
     text = "\n".join(lines)
     assert DISPLAY_CHECK in text
-    assert "will be a scripted, tested mode added in Task 13 — do not improvise it" in text
+    assert "§8.2 answered 2026-10-04: an import into the active slot is not heard/shown until the preset is re-selected on the pedal" in text
     assert midi_port_guard == []
 
 

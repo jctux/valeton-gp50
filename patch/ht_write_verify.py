@@ -497,8 +497,8 @@ def run(slot: int, session=None, log: Callable[[str], None] = print, placeholder
     log("manual check (record the answer in re/gp150/DEVICE_WRITE.md):")
     log(f"  a. select preset {display_number(slot):03d} on the pedal's display (internal slot {slot}; Suite "
         f"numbers presets from 001) and confirm the screen shows {final_name!r}; play a few notes: does it sound?")
-    log("  note: §8.2 (does the pedal refresh the active preset on rewrite?) will be a scripted, tested mode "
-        "added in Task 13 — do not improvise it.")
+    log("  note: §8.2 answered 2026-10-04: an import into the active slot is not heard/shown until the "
+        "preset is re-selected on the pedal.")
     return results
 
 

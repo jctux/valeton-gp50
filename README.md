@@ -44,7 +44,10 @@ speak the GP-5/GP-50 protocol, so it has its own preset codec (`app/static/prst1
 device profile.
 
 **Supported.** Everything in this list was run on a real GP-150 on 2026-10-04 unless it
-says otherwise ([`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md)).
+says otherwise ([`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md)). Two items were
+covered only in part: block-knob parameter edits went to the pedal only as the default
+values written by a Sweet Echo model pick, and the preset select is sent by the Explorer
+only while the pedal is connected (the request itself was checked from Python).
 
 - **Scan and browse all 200 preset slots**: name, the **12-block** chain (NR, PRE, WAH,
   DST, N→S, AMP, CAB, EQ, MOD, DLY, RVB, VOL) in its stored order, models and
@@ -53,14 +56,17 @@ says otherwise ([`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md)).
   1128-byte `.prst`, byte-for-byte what the pedal sent. `patch/ht_scan.py scan` saves
   all 200 slots to `device_scan_gp150/` ([`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md)).
 - **Rename** (up to 13 characters), **parameter edits** (block knobs, Patch VOL) and
-  **bypass** (block on/off), in the Explorer's Live edit.
+  **bypass** (block on/off), in the Explorer's Live edit. Patch VOL was changed on the
+  pedal; block knobs only through the defaults of the Sweet Echo pick.
 - **Block order**: drag blocks in the chain strip. **AMP stays first and VOL last**, and
   the codec refuses any other order. A reorder rewrites only the preset's order table,
   which is what the pedal does when you reorder on the pedal: the block records and
   their engine bytes never move. The reorder bytes were checked on the pedal (written
   from Python); the drag itself was only tested in automated Chromium.
-- **Model change**: pick another model for a block by its GP-150 name. Picking "None"
-  also turns the block off. The names come from a prebuilt catalog
+- **Model change** (verified for DLY on hardware; other slots allowed only when the
+  engine byte is unambiguous in the corpus, otherwise the picker greys the model out):
+  pick another model for a block by its GP-150 name. Picking "None" also turns the block
+  off. The names come from a prebuilt catalog
   (`patch/fxid_ring_gp150.json`). `patch/build_ring.py gp150` regenerates it from the
   public format notes plus a local Valeton Suite install; Valeton's `module150_data.json`
   itself is never committed. A type code that isn't mapped yet shows as `Type <n>`.
@@ -92,11 +98,19 @@ says otherwise ([`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md)).
 - **Conversion**: the Preset Converter refuses GP-150 files (different effect catalog).
   GP-5 ↔ GP-50 conversion is unchanged.
 - **Bluetooth**: USB only.
-- **WAH model picks**: no preset read so far has a real wah, so the wah's engine byte
-  isn't known and the editor refuses the pick. To teach it: set a wah on the pedal and
-  save, rescan (`patch/ht_scan.py scan`), run `python3 scripts/gp150_engines.py` (it
-  rewrites `patch/gp150_engines.json`), and copy the new table into `ENGINES` in
-  `app/static/prst150.js` (`app/tests/test_prst150_js.mjs` fails until the two match).
+- **Model picks with no known engine byte**: each block carries an engine byte that
+  depends on the effect, and a wrong one silences the preset. The editor picks a model
+  only when `patch/gp150_engines.json` shows one engine for it (or one engine for the
+  whole slot: NR, EQ, DLY, RVB, VOL); anything else is greyed out in the picker. That is
+  every WAH (no preset read so far has a real wah), most AMP models, and a few PRE, DST,
+  N→S, CAB and MOD ones. The committed table was learned from the maintainer's full
+  200-slot scan plus `re/gp150/evidence/` (203 distinct files); the scan isn't in the
+  repo, so `python3 scripts/gp150_engines.py --check` against the evidence alone reports
+  a difference. To teach a model: set it on your pedal and save, rescan your own pedal
+  (`patch/ht_scan.py scan`), run `python3 scripts/gp150_engines.py` (it rewrites
+  `patch/gp150_engines.json` from your scan + the evidence), and copy the new table into
+  `ENGINES` in `app/static/prst150.js` (`app/tests/test_prst150_js.mjs` fails until the
+  two match).
 
 **Known quirks:**
 

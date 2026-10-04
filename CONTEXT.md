@@ -41,7 +41,11 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
     from scanned presets by `scripts/gp150_engines.py`; the JS copy `ENGINES` in
     `prst150.js` is synced by hand, and `test_prst150_js.mjs` fails until it matches).
     An engine-0x06 block other than VOL is the "None" effect (type 3, off); VOL's
-    normal engine is 0x06. No real WAH engine is known, so a WAH model pick is refused.
+    normal engine is 0x06. A model pick needs an unambiguous engine: one engine for the
+    (slot, type) in the table's counts, or one engine for every seen type in the slot
+    (NR, EQ, DLY, RVB, VOL). Ambiguous pairs and unseen types in PRE, WAH, DST, N->S,
+    AMP, CAB and MOD are refused (`pick_allowed`; the Explorer greys them out); a re-pick
+    of the stored model keeps its engine.
   - **Models**: a block names its model by `(slot, type)`, where type is a per-slot
     enumeration (not an fxid low byte). The ring `patch/fxid_ring_gp150.json` is keyed
     **`(slot << 24) | type`**.

@@ -50,8 +50,11 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
   `[01][icrc][len u16 LE] + payload`. For a preset read, payload (1132) =
   `03 03 11 30` + 1128-byte `.prst`. **The host must ACK the final chunk immediately**
   (`id = transfer_id`); a ~1.5 s delay made the pedal retransmit the stream.
-- **Empty slot**: reading slot 199 produced no reply at all. Treat a 1.5 s silence after
-  the ACK as "empty slot".
+- **Empty slot**: reading slot 199 produced no reply at all. *(History: observed before
+  the session-open fix below, with family-0x00 frames filtered out, so an ACK could have
+  gone unseen. On 2026-10-04 every slot was ACKed: the first scan, before the session
+  open, got `200 ACKed, 0 un-ACKed` and no stream; after the fix all 200 slots streamed
+  a preset.)* Treat a 1.5 s silence after the ACK as "empty slot".
 - **Reading does not change the active preset** (re-read of active after 3 slot reads:
   byte-identical).
 - **Write / import preset** (from Suite captures `suite-triggered-import-patch-file-into-
@@ -105,8 +108,13 @@ Evidence files: `re/gp150/evidence/` (probe logs, read presets), `re/gp150/probe
 > CAB {1A, 0A}, EQ {01}, MOD {04, 01}, DLY {0B}, RVB {0C}, VOL {06}; the "None" effect
 > (type 3 outside VOL) is `0x06` and off. The variant depends on the effect type: the
 > codec takes it from `patch/gp150_engines.json` (learned per (slot, type) from the
-> user's 200-slot scan + evidence by `scripts/gp150_engines.py`; an unseen type gets the
-> slot's most common engine; a real WAH pick is refused). Moving records and giving a
+> user's 200-slot scan + evidence by `scripts/gp150_engines.py`). A model pick is allowed
+> only when the engine is unambiguous: the (slot, type) has ONE engine in the table's
+> counts, or the slot has one engine for every seen type (NR, EQ, DLY, RVB, VOL; an unseen
+> type takes it). Ambiguous pairs (AMP 1, PRE 11, DST 117) and unseen types in PRE, WAH,
+> DST, N→S, AMP, CAB and MOD are refused (`pick_allowed` / `pickAllowed`; the Explorer
+> greys them out), because a wrong engine silences the preset; re-picking the model
+> already stored keeps its engine. Moving records and giving a
 > moved block its new position's engine — what the codec did before — made the pedal
 > read the delay record as the reverb slot: no sound with engine `0x0C`, an inert delay
 > with `0x0B` (hardware, slot 199). Decoding by chain position also mislabelled the 8
@@ -158,7 +166,7 @@ Same method surface as `prst.js` so `patchlib.js`, `static_api.js`, `explorer.js
 | `modelRecords` | per slot, read from the slot's home record: `[type, slot, ext<<16 \| subtype<<8 \| type]`; `blocksBySlot` adds `{slot, rec, pos, enabled, engine, params}` (`pos` from the order table) |
 | `bypassMask` | from per-block `enabled` bytes |
 | `paramFloats` | 12 × 15 float32 |
-| `applyEdits` | name / vol / bpm / order / enabled / type / params, each addressing the slot's home record; a model change writes the type + the slot's engine for it (`slotEngine`, from `patch/gp150_engines.json`; None = `0x06` + off); order = order table only; engines never recomputed by position; device-owned bytes untouched |
+| `applyEdits` | name / vol / bpm / order / enabled / type / params, each addressing the slot's home record; a model change writes the type + the slot's engine for it (`slotEngine`, from `patch/gp150_engines.json`; None = `0x06` + off; refused unless `pickAllowed`, except a re-pick of the stored model, which keeps its engine); order = order table only; engines never recomputed by position; device-owned bytes untouched |
 | `blankPrst(slot)` | factory "New GEN." header + footer template with index set, name "New GEN." |
 | `refixCrc` | no-op |
 | `rebuild(name, body)` | not applicable; stream yields the whole file |

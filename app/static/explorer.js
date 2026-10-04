@@ -1,6 +1,6 @@
 "use strict";
 
-// GP-50 Preset Explorer. Renders every preset's ACTIVE chain at
+// Preset Explorer (GP-5 / GP-50 / GP-150). Renders every preset's ACTIVE chain at
 // Block · Type · Model granularity and filters over it. Reads real parsed data
 // from /api/device/inventory (patches carry a `blocks` array) + /api/device/facets.
 (() => {

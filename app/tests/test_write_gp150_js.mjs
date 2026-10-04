@@ -10,7 +10,10 @@
  *    the Explorer's edit flows go through the GP-150 codec), so writeSlot sends with
  *    { confirm: true }; it still refuses without confirm, a preset of the other
  *    device family, and — if the flag is turned off again — anything without
- *    allowUnverified, sending zero bytes; GP-5/GP-50 writeSlot unchanged.
+ *    allowUnverified, sending zero bytes; GP-5/GP-50 writeSlot unchanged;
+ *  - a GP-150 preset to a connected GP-50 is refused by EACH layer on its own:
+ *    writeSlot's transport check (before the device layer) and _sendStream's HT-frame
+ *    check on the legacy transport.
  *   node app/tests/test_write_gp150_js.mjs
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -431,6 +434,26 @@ const READ_BACK = /read slot 199 back before retrying/;
   check("legacy: GP-50 connected", info50.key === "gp50");
   r = await rejects(WW.writeSlot(7, finger, { confirm: true, allowUnverified: true }), /GP-150|connected/);
   check("legacy: a GP-150 preset is not written to a GP-50", r.ok && ackEcho.sent.length === 0, r.why);
+  // each layer refuses on its own (one guard must not hide the other's removal): a GP-150
+  // blank to the connected GP-50 ...
+  const blank150 = PRST.codecFor("gp150").blankPrst(7), ht7 = WW.buildPatchWriteStream(blank150, 7);
+  check("legacy: the GP-150 blank builds a valid HT stream", WW.isHtStream(ht7) && WW.validateStream(ht7, 7)[0] === true);
+  // ... (1) writeSlot's transport check refuses before the device layer is reached
+  const realSend = D._sendStream; let reached = 0;
+  D._sendStream = (...a) => { reached++; return realSend(...a); };
+  for (const opts of [{ confirm: true }, { confirm: true, allowUnverified: true }]) {
+    r = await rejects(WW.writeSlot(7, blank150, opts), /^refusing to send: a GP-150 preset cannot be written to the connected GP-50$/);
+    check(`writeSlot layer: GP-150 blank -> connected GP-50 refused (${JSON.stringify(opts)})`, r.ok && reached === 0, `${r.why} (device layer reached ${reached}x)`);
+  }
+  D._sendStream = realSend;
+  // ... (2) the device layer's own check: HT frames never go out on the legacy transport
+  for (const opts of [{ confirm: true, validated: true }, { confirm: true, validated: true, allowUnverified: true }]) {
+    let e = null, ret = null;
+    try { ret = D._sendStream(ht7, opts); } catch (x) { e = x; }
+    if (ret && typeof ret.then === "function") await ret.catch(() => {});
+    check(`_sendStream layer: HT frames to the connected GP-50 refused (${JSON.stringify(opts)})`, e && /^refusing to send: GP-150 \(HT\) frames to a GP-50$/.test(e.message), e ? e.message : "did not throw");
+  }
+  check("legacy: neither layer sent a byte to the GP-50", ackEcho.sent.length === 0, `${ackEcho.sent.length}`);
   const lw = await WW.writeSlot(7, gp50, { confirm: true });
   const legacyPk = WW.buildPatchWriteStream(gp50, 7);
   check("legacy: writeSlot result unchanged", lw.sent === legacyPk.length && lw.acks === legacyPk.length && lw.notified === undefined, JSON.stringify(lw));
