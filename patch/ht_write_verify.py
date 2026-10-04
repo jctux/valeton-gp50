@@ -62,7 +62,9 @@ from patch import ht_proto as ht  # noqa: E402
 from patch import ht_scan  # noqa: E402 — ht_scan.Session only
 from patch import prst150_format as f150  # noqa: E402
 
-IGNORE = (0x0A, 0x0D, 0x0E, 0x0F)  # import marker (0x5C vs 0x58) + device-written field
+# device-owned bytes: import marker (0x5C sent, 0x58 stored), device-written field,
+# "saved on the pedal" flag (0x43C), enable bits (0x445: bit0 MOD, bit1 DLY, bit2 RVB, bit3 VOL)
+IGNORE = (0x0A, 0x0D, 0x0E, 0x0F, 0x43C, 0x445)
 SOURCE_SLOT = 0  # the preset copied for the write test (a factory preset)
 TEST_NAME = "WRITE TEST"
 BLANK_NAME = "New GEN."

@@ -582,12 +582,15 @@ def test_no_handshake_fails_step_1_and_sends_nothing_else(monkeypatch, midi_port
 
 # --- pieces ---------------------------------------------------------------------------
 
-def test_same_except_ignores_only_0x0a_and_0x0d_to_0x0f():
+def test_same_except_ignores_only_the_device_owned_bytes():
+    # 0x0A import marker (0x5C sent, 0x58 stored), 0x0D-0x0F device-written field,
+    # 0x43C "saved on the pedal" flag, 0x445 enable bits (bit0 MOD .. bit3 VOL; the pedal
+    # set bit 1 when a delay became active, Task 13 checklist 2026-10-04)
     a = bytes(CORPUS_PRST)
-    assert hwv.IGNORE == (0x0A, 0x0D, 0x0E, 0x0F)
+    assert hwv.IGNORE == (0x0A, 0x0D, 0x0E, 0x0F, 0x43C, 0x445)
     assert hwv.same_except(a, a)
-    assert hwv.same_except(a, flip(a, 0x0A, 0x0D, 0x0E, 0x0F))
-    for off in (0x00, 0x04, 0x09, 0x0B, 0x0C, 0x10, 0x2C, 0x3B4, len(a) - 1):
+    assert hwv.same_except(a, flip(a, 0x0A, 0x0D, 0x0E, 0x0F, 0x43C, 0x445))
+    for off in (0x00, 0x04, 0x09, 0x0B, 0x0C, 0x10, 0x2C, 0x78, 0x84, 0x3B4, 0x43B, 0x43D, 0x444, 0x446, len(a) - 1):
         assert not hwv.same_except(a, flip(a, off)), hex(off)
     assert not hwv.same_except(a, a[:-1])
     assert hwv.same_except(a, flip(a, 0x30), ignore=(0x30,))
