@@ -48,9 +48,10 @@ for (const rec of corpus) {
   check(`${tag} no-mutate`, b64(base) === rec.baseB64);
 }
 
-// GP-150: the three evidence presets, edited by prst150_format.apply_edits
+// GP-150: the evidence presets (re/gp150/evidence/*.prst, 8 of them with a
+// non-default chain order), edited by prst150_format.apply_edits
 const gp150 = corpus.filter((r) => r.srcKey === "gp150");
-check("gp150 records present (3 evidence presets)", gp150.length === 3, `got ${gp150.length}`);
+check("gp150 records present (11 evidence presets)", gp150.length === 11, `got ${gp150.length}`);
 
 console.log(`\nvectors: ${corpus.length} (gp150: ${gp150.length})`);
 console.log(`checks: ${pass + fail}   pass: ${pass}   fail: ${fail}`);
