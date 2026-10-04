@@ -125,3 +125,34 @@ Failure record: _(fill in only if a step FAILed)_
 If every step row is PASS and (a) is yes, the controller flips the **Python** gate
 (`WRITE_VERIFIED["gp150"] = True` in `patch/device_write.py`, plus its tests; Task 12
 Steps 3–4). The browser gate (`webmidi_write.js`) stays `false` until Task 13.
+
+
+## Run 2026-10-04 08:01 — slot 199 (display 200), `--placeholder` mode, USB, Valeton Suite closed
+
+Pedal had NO empty slot (slots 111..199 = 89 byte-identical factory "It's GP-150" placeholders), so the test used the placeholder mode: write, read back, restore the original from the scan, read back.
+
+```
+GP-150 write verification: target slot 199 (display 200), source slot 0, WRITE_VERIFIED['gp150'] = False (this run passes allow_unverified)
+0 PASS scan precondition (placeholder) — /Users/jc/Music/valeton-gp50/device_scan_gp150/scan_summary.json (2026-10-04 07:44): slot 199 holds the factory placeholder "It's GP-150", byte-identical (except 0x04) to 88 other slots e.g. [111, 112, 113, 114, 115]; the original is restored in step 5
+1 PASS hello + read active — handshake answered; active preset index 100 'Nothin-GT1', 1128 bytes
+2 PASS target slot holds the scanned placeholder — slot 199 still holds the scanned placeholder index 199 "It's GP-150"
+  backup: active preset -> /Users/jc/Music/valeton-gp50/device_scan_gp150/write_verify_backup/100-Nothin_GT1.prst
+  backup: write-test preset (for slot 199) -> /Users/jc/Music/valeton-gp50/device_scan_gp150/write_verify_backup/199-WRITE_TEST.prst
+3 PASS import WRITE TEST — copy of slot 0 (index 0 'New GEN.') renamed 'WRITE TEST' -> slot 199: 10 chunks sent, ACK, 0x08 'import done' received
+4 PASS read back == sent — read back index 199 'WRITE TEST' == sent; back[0x0A] = 0x58 (the import sent 0x5c); ignored differences: 0x00e 0x00f
+5 PASS restore the original — original index 199 "It's GP-150" written back: 10 chunks sent, ACK, 0x08 'import done' received; read back == original
+6 PASS active preset unchanged — identical to step 1's read (index 100 'Nothin-GT1')
+all 7 steps PASS — copy this whole output into re/gp150/DEVICE_WRITE.md
+manual check (record the answer in re/gp150/DEVICE_WRITE.md):
+  a. select preset 200 on the pedal's display (internal slot 199; Suite numbers presets from 001) and confirm the screen shows "It's GP-150"; play a few notes: does it sound?
+  note: §8.2 (does the pedal refresh the active preset on rewrite?) will be a scripted, tested mode added in Task 13 — do not improvise it.
+```
+
+- exit status: 0 (all seven steps PASS)
+- `back[0x0A]` = 0x58: the pedal stores the export form (the import sent 0x5C); device-written offsets that differed: 0x0E, 0x0F
+- ACK of the transfer id: yes, both imports; 0x08 'import done' received both times
+- step 2 status: slot held the scanned placeholder (placeholder mode; empty-slot statuses not applicable)
+- backups: device_scan_gp150/write_verify_backup/100-Nothin_GT1.prst, 199-WRITE_TEST.prst (+ the full scan under device_scan_gp150/)
+- `[warn]`/`[debug]` lines: none
+- pedal responsive afterwards: _(fill in)_
+- (a) manual check — preset 200 on the display shows "It's GP-150" and plays: _(fill in)_
