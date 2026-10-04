@@ -1,6 +1,8 @@
 # GP-150 support — design spec
 
-Date: 2026-10-03. Status: approved design, pre-implementation.
+Date: 2026-10-03. Status: implemented on `gp150-support`; reads and writes verified on a
+GP-150 on 2026-10-04 (`re/gp150/DEVICE_READ.md`, `re/gp150/DEVICE_WRITE.md`). §2 carries
+the hardware corrections of 2026-10-04.
 Branch: `gp150-support` on `jctux/valeton-gp50`, to be PR'd to `drewmerc302/valeton-gp50`.
 
 ## 1. Goal
@@ -53,7 +55,7 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
 - **Reading does not change the active preset** (re-read of active after 3 slot reads:
   byte-identical).
 - **Write / import preset** (from Suite captures `suite-triggered-import-patch-file-into-
-  slot-01/04`, NOT yet sent to the GP-150): host sends a family-0x70 stream with
+  slot-01/04`; sent to the GP-150 and verified on 2026-10-04): host sends a family-0x70 stream with
   logical message `[01][icrc][6c 04]` + payload `01 03 11 30` + the 1128-byte file where
   byte `0x0A` is `0x5C` (the exported file has `0x58`); chunk_idx is 0-based for
   host→device (1-based device→host). Device replies ACK (`id` = transfer_id), then a
@@ -163,7 +165,7 @@ Same method surface as `prst.js` so `patchlib.js`, `static_api.js`, `explorer.js
 | `convert`, `checkConvertible` | refuse for gp150 (out of scope) |
 
 Catalog lookup key for the GP-150 is `(slot, type)` not `fxid`; `patchlib` already
-takes a ring keyed by integer, so the GP-150 ring is keyed by `slot<<8 | type` with the
+takes a ring keyed by integer, so the GP-150 ring is keyed by `(slot<<24) | type` with the
 same value shape (`module, name, fxtitle, type, origin, params[]`).
 
 ### 3.3 Catalog ring `fxid_ring_gp150.json`
@@ -208,15 +210,23 @@ Single write engine = full-preset import to a slot, mirroring the GP-50's 0x1D m
 
 1. `importPresetStream` built byte-for-byte against the two captured Suite imports
    (test fixture: GP-180 corpus files; the logical message incl. `icrc` must match).
-2. `WRITE_VERIFIED["gp150"] = False`. `send_stream`/`_sendStream` refuse unless
+2. `WRITE_VERIFIED["gp150"] = False` until step 3 passes (flipped 2026-10-04: Python
+   after the slot-199 run, browser after the Explorer edits moved to this codec).
+   Until then `send_stream`/`_sendStream` refuse unless
    `allow_unverified` (CLI) / an explicit "I am testing" confirm (UI dev flag).
 3. Verification protocol (one session, user present): read slot 199 (expect empty) →
    import a factory preset copy with index 199 → expect ACK + 0x08 → read back → compare
-   byte-for-byte ignoring `0x0D..0x0F` → clear slot 199 by importing `blankPrst(199)`
-   → read back. Only then flip the gate.
+   byte-for-byte ignoring the device-owned bytes `0x0A`, `0x0D..0x0F`, `0x43C` and `0x445`
+   (`ht_write_verify.IGNORE`) → clear slot 199 by importing `blankPrst(199)`
+   → read back. Only then flip the gate. (The test pedal had no empty slot, so the
+   2026-10-04 run used `--placeholder`: the target held a factory placeholder that is
+   byte-identical to ≥10 other slots, and step 5 restored it from the scan.)
 4. All edits (rename, reorder, param, enable, clear, block reorder) = `applyEdits` →
    import to the same slot. Live edit on the active slot: first verified write tells us
    whether the pedal reloads the active patch; if not, follow with `selectSlot`.
+   Answered 2026-10-04: it does not reload. The app does not send `selectSlot` after a
+   write yet (whether selecting the already-active slot reloads it is untested); the
+   README tells the user to re-select the preset on the pedal.
 
 ### 3.7 UI/product surface
 
@@ -274,6 +284,8 @@ tested — port name "Valeton GP-180 MIDI").
    shows 0x0c reads with different selectors returning 0x10/0x18/0x2c streams; decode
    later).
 2. Does a 0x70 import to the active slot reload the live patch? (first gated write).
+   **Answered 2026-10-04: no.** The import is stored, but the pedal keeps playing the old
+   version until the preset is re-selected.
 3. Device firmware version and the 0x10 reply semantics (identical bytes on GP-180 and
    GP-150, so not an identity message).
 

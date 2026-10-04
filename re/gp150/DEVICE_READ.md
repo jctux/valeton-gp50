@@ -6,9 +6,9 @@ Date: 2026-10-03. Branch `gp150-support`.
 |---|---|
 | Wire facts below | Verified live on a GP-150 (USB PID 0x0186) with the throwaway probes in `re/gp150/probes/` (logs + presets in `re/gp150/evidence/`), and offline against the GP-180 Suite capture corpus (`app/tests/fixtures/gp150/ht_corpus.json`). |
 | `patch/ht_proto.py` / `app/static/ht_proto.js` builders + parsers | Byte-exact against the corpus (`test_ht_proto.py`, `test_ht_proto_js.mjs`). |
-| `patch/ht_scan.py` (CLI + `Session`) | Tested against a scripted fake port pair only (`app/tests/test_ht_scan.py`). **Not yet run against the pedal.** |
-| Browser scan (`ht_transport.js` via the Explorer) | Tested against a fake pedal only (`test_ht_transport_js.mjs`, `test_static_api_gp150_js.mjs`). **Not yet run against the pedal.** |
-| Hardware checklist (bottom of this file) | **PENDING — not run.** Nothing in that section has been observed yet. |
+| `patch/ht_scan.py` (CLI + `Session`) | Fake port pair tests (`app/tests/test_ht_scan.py`), then the pedal on 2026-10-04: full scan, 200/200 presets in 70 s (see "Session 2026-10-04" at the end). |
+| Browser scan (`ht_transport.js` via the Explorer) | Fake-pedal tests (`test_ht_transport_js.mjs`, `test_static_api_gp150_js.mjs`), then the pedal on 2026-10-04: Chrome scans and rescans during the Task 13 checklist (`DEVICE_WRITE.md`). |
+| Hardware checklist (bottom of this file) | Run 2026-10-04. The results are under "Session 2026-10-04" rather than in the table rows; questions (a) and (b) are answered there. |
 
 ## Wire facts (spec §2, condensed)
 
@@ -37,12 +37,12 @@ Date: 2026-10-03. Branch `gp150-support`.
 - **The final chunk must be ACKed immediately** (`id = transfer_id`). A ~1.5 s late ACK
   made the pedal retransmit the whole stream.
 - **Empty slot**: reading slot 199 produced no stream. The probe filtered family-0x00
-  frames, so whether an ACK came before the silence is **not recorded** — open question (a).
+  frames, so whether an ACK came before the silence is **not recorded** — open question (a). On 2026-10-04 the pedal ACKed every read that then streamed nothing (see the session notes at the end).
 - **Reading does not change the active preset** (re-read of the active preset after three
   slot reads was byte-identical).
 - **Preset byte 0x04** held the slot index on both slot reads made so far (slot 0 → 0,
   slot 99 → 99; the read of the active preset returned index 100). Only those data points
-  exist — open question (b).
+  exist — open question (b), answered 2026-10-04: yes, 200/200 slots.
 
 ## Read rules (`patch/ht_scan.py` `Session` == `app/static/ht_transport.js`)
 
@@ -101,8 +101,11 @@ the order table at `0x78` lists slots by chain position. Record layout: `+0x00` 
 `+0x05` subtype, `+0x06` ext, `+0x07` engine, `+0x08…` 15 × float32 params.
 
 The engine byte per (slot, type) comes from `patch/gp150_engines.json`, learned from a scan by
-`python3 scripts/gp150_engines.py` (`--check` compares). No preset read so far has a real wah, so
-the editor refuses a WAH model pick: set one on the pedal, save, rescan, and rerun the script.
+`python3 scripts/gp150_engines.py` (`--check` compares). The browser codec carries its own copy,
+`ENGINES` in `app/static/prst150.js`, which is synced **by hand**: after the script rewrites the
+JSON, copy the table into `ENGINES` (`app/tests/test_prst150_js.mjs` fails until the two match).
+No preset read so far has a real wah, so the editor refuses a WAH model pick: set one on the
+pedal, save, rescan, rerun the script, and update `ENGINES`.
 
 ### Type codes
 
@@ -124,9 +127,9 @@ python3 patch/build_ring.py gp150
 
 ---
 
-## PENDING — hardware checklist (user, pedal on USB)
+## Hardware checklist (user, pedal on USB)
 
-**Status: NOT RUN.** Fill in each result as observed. Do not copy the expected values.
+**Status:** run 2026-10-04; results in "Session 2026-10-04" below. Fill in each result as observed. Do not copy the expected values.
 Setup: GP-150 on USB, Valeton Suite **closed**, `.venv-midi` present (see above).
 
 | # | Run | Record |

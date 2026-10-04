@@ -3,8 +3,9 @@
 
 GP-150 (HT transport): a whole-preset import over a family-0x70 chunk stream,
 built byte-for-byte like Valeton Suite's captured import
-(build_gp150_write_stream / validate_gp150_stream); send_stream() refuses it
-until WRITE_VERIFIED["gp150"] is flipped after the supervised hardware write.
+(build_gp150_write_stream / validate_gp150_stream); send_stream() sends it only
+while WRITE_VERIFIED["gp150"] is True (flipped 2026-10-04 after the supervised
+hardware write, re/gp150/DEVICE_WRITE.md).
 The GP-5/GP-50 (0x1D) description below is unchanged.
 
 The wire format is cracked (see re/SNAPTONE_PROTOCOL.md): each packet is
@@ -43,8 +44,8 @@ from patch.prst_format import (  # noqa: E402
 # captures. Until a GP-5 patch-import is captured, a GP-5 write reuses the GP-50
 # constants on faith; send_stream() refuses it unless explicitly allowed. See
 # re/DEVICE_WRITE.md. The GP-150 (HT import stream, below) is byte-exact against
-# Suite's capture but has never been sent to a GP-150: refused until the
-# supervised hardware write (plan Task 12) passes.
+# Suite's capture and passed the supervised hardware write on 2026-10-04
+# (re/gp150/DEVICE_WRITE.md).
 WRITE_VERIFIED = {"gp50": True, "gp5": False, "gp150": True}  # gp150: verified on hardware 2026-10-04 (re/gp150/DEVICE_WRITE.md)
 
 

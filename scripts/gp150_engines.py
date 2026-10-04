@@ -8,6 +8,10 @@
 Default corpus: device_scan_gp150/ (the user's full scan, not committed) +
 re/gp150/evidence/; byte-identical files are counted once.
 
+The browser codec has its own copy of this table, ENGINES in app/static/prst150.js,
+synced BY HAND: after this script rewrites patch/gp150_engines.json, copy the table
+into ENGINES (app/tests/test_prst150_js.mjs fails until the two match).
+
 Hardware facts (2026-10-04, re/gp150/evidence/199-reordered-by-pedal.prst): every
 block slot's 68-byte record sits at a FIXED index, the slot's home position
 (prst150_format.DEFAULT_POS); a reorder rewrites only the order table. The engine

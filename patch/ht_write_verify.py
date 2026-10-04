@@ -24,9 +24,10 @@ first FAIL, and it never writes unless steps 0 and 2 showed the target slot EMPT
     device_scan_gp150/write_verify_backup/; import a copy of slot 0 renamed
     "WRITE TEST" into <slot>: the pedal must ACK the import and send its 0x08
     "import done"
- 4. read <slot> back: byte-identical to what was sent, except 0x0A (the import
-    sends 0x5C, exports carry 0x58; `back[0x0A]` is printed) and 0x0D..0x0F
-    (device-written); the differing offsets are printed
+ 4. read <slot> back: byte-identical to what was sent, except the device-owned
+    bytes in IGNORE: 0x0A (the import sends 0x5C, exports carry 0x58; `back[0x0A]`
+    is printed), 0x0D..0x0F (device-written), 0x43C ("saved on the pedal" flag)
+    and 0x445 (enable bits); the differing offsets are printed
  5. import blank(<slot>) ("New GEN.") the same way; read back: name "New GEN."
  6. read the active preset again: byte-identical to step 1's (reads and writes to
     another slot must not touch it)
@@ -34,11 +35,17 @@ first FAIL, and it never writes unless steps 0 and 2 showed the target slot EMPT
 From step 3 on, every FAIL ends with "read slot <slot> back before retrying": the
 slot may or may not hold the import (`./.venv-midi/bin/python patch/ht_scan.py read <slot>`).
 
+--placeholder (a pedal with no empty slot; how it ran on 2026-10-04): step 0 needs the
+scan to show <slot> holding the same bytes as at least MIN_TWINS other slots (except
+0x04), i.e. a factory placeholder; step 2 re-reads it; step 5 writes the scanned
+original back and reads it again.
+
 ONE ht_scan.Session carries every read and both writes (a second session on the
 port would ACK the pedal's 0x08 twice). The writes go through the gated sender,
 device_write.send_stream(None, pk, confirm=True, validated=ok,
 allow_unverified=True, session=s); this script never changes
-WRITE_VERIFIED["gp150"] — that is flipped by hand, and only after seven PASS lines.
+WRITE_VERIFIED["gp150"] — that is flipped by hand, and only after seven PASS lines
+(done 2026-10-04, re/gp150/DEVICE_WRITE.md).
 The MIDI ports are opened only by ht_scan.Session (open_ports is deliberately
 never imported by name here, so the test suite's guard on ht_scan.open_ports
 stands between any test and the real pedal).

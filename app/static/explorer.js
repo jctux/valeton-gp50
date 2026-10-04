@@ -263,8 +263,9 @@
     if (e && e.models[blkIdx] !== undefined && window.ExplorerEdits.nonePick(devKey(), blkIdx, e.models[blkIdx])) return false;
     return stored;
   }
-  // Current chain order (chain position -> model-record index). Pending reorder wins;
-  // falls back to the decoded order, then canonical identity.
+  // Current chain order (chain position -> block index: the model-record index on the
+  // GP-5/GP-50, the slot id on the GP-150, whose records sit at fixed home indexes).
+  // Pending reorder wins; falls back to the decoded order, then canonical identity.
   function curOrder(p) {
     const e = edits.get(p.slot);
     if (e && e.order != null) return e.order;
@@ -682,7 +683,8 @@
   }
 
   // Read the chain order back from the strip DOM: movable chips contribute their
-  // record index; the core group expands to its blocks (kept contiguous + in order).
+  // block index (data-rec: GP-5/GP-50 record index, GP-150 slot id); the core group
+  // expands to its blocks (kept contiguous + in order).
   function chainOrderFromDom(strip) {
     const order = [];
     for (const el of strip.children) {
@@ -798,7 +800,8 @@
     d.appendChild(buildChainStrip(p));
 
     // per-block: bypass toggle + editable params, rendered in CHAIN order (blkIdx
-    // stays the model-record index, so all edits keep keying by record index).
+    // stays the block index — GP-5/GP-50 model record, GP-150 slot id — so all edits
+    // keep keying by it, whatever the chain position).
     curOrder(p).forEach((blkIdx) => {
       const b0 = p.blocks[blkIdx];
       if (!b0) return;

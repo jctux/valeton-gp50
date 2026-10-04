@@ -171,7 +171,7 @@
       for (const p of patches) {
         p.snaptone_name = p.snaptone_slot ? (slotLabel[p.snaptone_slot] || "") : "";
         p.blocks = blocksFor(raw[p.slot], slotLabel);
-        p.order = C.readOrder(raw[p.slot]); // chain[pos] = block(record) index
+        p.order = C.readOrder(raw[p.slot]); // chain[pos] = block index (GP-5/50: record; GP-150: slot id)
       }
 
       // IR/Cab inventory: full catalog + usage counts

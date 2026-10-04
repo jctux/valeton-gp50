@@ -5,10 +5,10 @@ Date: 2026-10-03. Branch `gp150-support`.
 | What | Status |
 |---|---|
 | Import stream (`device_write.build_gp150_write_stream` / `webmidi_write.js`) | Byte-exact against Suite's captured import (`test_device_write_gp150.py`, `test_write_gp150_js.mjs`). |
-| Gated sender (`device_write.send_stream(..., session=s)`, `ht_transport.js writePreset`) | Tested against a scripted fake pedal only. |
-| `patch/ht_write_verify.py` (the seven-step protocol below, steps 0–6) | Tested against a scripted fake pedal only (`app/tests/test_ht_write_verify.py`). **Not yet run against the pedal.** |
-| Hardware run (bottom of this file) | **PENDING — not run.** Nothing in that section has been observed yet. |
-| Gate | `WRITE_VERIFIED["gp150"] = False` in `patch/device_write.py` **and** `app/static/webmidi_write.js`. |
+| Gated sender (`device_write.send_stream(..., session=s)`, `ht_transport.js writePreset`) | Fake-pedal tests, then the pedal: the Python sender in the 2026-10-04 run below, the browser sender in the Task 13 checklist. |
+| `patch/ht_write_verify.py` (the seven-step protocol below, steps 0–6) | Fake-pedal tests (`app/tests/test_ht_write_verify.py`), then run on the pedal 2026-10-04 in `--placeholder` mode on slot 199: all 7 steps PASS (run below). |
+| Hardware run | **Done 2026-10-04.** The pedal had no empty slot, so the run used `--placeholder`. See "Run 2026-10-04" and the Task 13 checklist at the end of this file. |
+| Gate | **Open.** `WRITE_VERIFIED["gp150"] = True` in `patch/device_write.py` (after the 2026-10-04 run) and `WRITE_VERIFIED.gp150 = true` in `app/static/webmidi_write.js` (after the Explorer's edit flows moved to the GP-150 codec, Task 13). |
 
 **Numbering:** the script and `ht_scan.py` use internal slots 0–199. The pedal's display
 and Suite number presets from 001, so display number = slot + 1 (slot 199 = preset 200).
@@ -28,20 +28,22 @@ unless steps 0 and 2 showed the target slot empty.
 | 1 | hello + read active | The pedal answered the handshake. The active preset read back as a 1128-byte GP-150 preset (kept for step 6) and is **not** the target slot; if it is, step 1 refuses. |
 | 2 | target slot is empty | **Two** reads of `<slot>` both came back empty with `last_status=empty-acked`. Each waits 3 s of silence after the ACK, then watches the input for 2 s more. It FAILs on a preset, on a late preset stream (a discarded 0x70 chunk), on a partial stream the read retried past (any chunk frame in any of its exchanges), on corrupt frames, or on `empty-unacked`: with no ACK, an empty slot and a lost request look the same. There is no override. |
 | 3 | import WRITE TEST | Two backups are saved first, and their paths printed (`  backup: …`), under `device_scan_gp150/write_verify_backup/`: the active preset, and exactly what goes to `<slot>`. Then a copy of slot 0, renamed "WRITE TEST", was imported to `<slot>`. All 10 chunks went out and the pedal sent its 0x08 "import done". The line says `ACK` or `NO ACK of the transfer id`. |
-| 4 | read back == sent | `<slot>` reads back byte-identical to what was sent, except 0x0A (the import sends 0x5C, exports carry 0x58) and 0x0D..0x0F (device-written). It prints `back[0x0A]` and the ignored differences. |
+| 4 | read back == sent | `<slot>` reads back byte-identical to what was sent, except the device-owned bytes (`IGNORE`): 0x0A (the import sends 0x5C, exports carry 0x58), 0x0D..0x0F (device-written), 0x43C ("saved on the pedal" flag) and 0x445 (enable bits: bit0 MOD, bit1 DLY, bit2 RVB, bit3 VOL). It prints `back[0x0A]` and the ignored differences. |
 | 5 | import blank, read back | `blank(<slot>)` was imported the same way and reads back named "New GEN.". The slot is left holding that blank, so it is no longer empty. |
 | 6 | active preset unchanged | The active preset reads back byte-identical to step 1's read. |
 
 From step 3 on, every FAIL ends with **"read slot `<slot>` back before retrying"**: the
 slot may or may not hold the import.
 
-§8.2 (does the pedal refresh the active preset on rewrite?) will be a scripted, tested mode added in Task 13 — do not improvise it.
+`--placeholder` mode is for a pedal with no empty slot. Step 0 requires the target slot's scanned bytes to equal those of at least 10 other scanned slots (except byte 0x04), which shows it holds a factory placeholder and not a user preset. Step 2 re-reads the slot, and step 5 writes the original back and reads it again.
+
+§8.2 (does the pedal refresh the active preset on rewrite?) was answered by hand in the Task 13 checklist: **no**. An import into the active slot is stored, but the pedal keeps playing the old version until the preset is re-selected.
 
 ---
 
-## PENDING — hardware run (user, pedal on USB)
+## Hardware run template (empty-slot mode)
 
-**Status: NOT RUN.** Fill in each result as observed. Do not copy the expected values.
+**Status:** not used. The 2026-10-04 run used `--placeholder` mode because the pedal had no empty slot; its results are in "Run 2026-10-04" below. This template stays for a pedal that has an empty slot. Fill in each result as observed. Do not copy the expected values.
 **Do not flip `WRITE_VERIFIED["gp150"]` unless every step row below is PASS and check (a) is "yes".**
 
 Setup: GP-150 on USB, Valeton Suite **closed**, `.venv-midi` present (see `DEVICE_READ.md`).
@@ -88,7 +90,7 @@ echo "exit ${pipestatus[1]}"                            # zsh, immediately after
 | Step 3 backup paths (the two `  backup: …` lines) | _(fill in)_ |
 | Step 3 and step 5: `ACK` or `NO ACK of the transfer id` | _(fill in)_ |
 | Step 4 `back[0x0A]` (does the pedal store 0x5c or 0x58?) | _(fill in)_ |
-| Step 4 ignored differences (a subset of 0x00a 0x00d 0x00e 0x00f) | _(fill in)_ |
+| Step 4 ignored differences (a subset of 0x00a 0x00d 0x00e 0x00f 0x43c 0x445) | _(fill in)_ |
 | Step 5 differences from `blank(199)` outside the ignored offsets | _(fill in)_ |
 | Any `[warn]` / `[debug]` lines (unsolicited 0x18 frames, "0x08 arrived before the import was complete", corrupt frames) | _(fill in)_ |
 | Pedal screen/sound during the run: did anything change? | _(fill in)_ |
