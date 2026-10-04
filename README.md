@@ -2,8 +2,8 @@
 
 A browser-based editor for the **Valeton GP-50** (and GP-5), built by reverse-engineering
 the pedal's MIDI SysEx protocol from scratch. It reads and writes the device live over
-**WebMIDI** — no vendor SDK, no drivers, no backend. The **GP-150** can be read but not
-yet written ([GP-150](#gp-150-read-only-for-now)).
+**WebMIDI** — no vendor SDK, no drivers, no backend. The **GP-150** is supported too,
+over USB, minus a few features ([GP-150](#gp-150)).
 
 **Live demo:** [valeton-gp50-woad.vercel.app](https://valeton-gp50-woad.vercel.app) —
 zero-setup, runs entirely in-browser. Chrome or Edge, pedal on USB.
@@ -35,69 +35,131 @@ Everything above runs client-side. The live demo is the whole app; the local Fas
 server ([Setup](#setup)) is only for development and for the legacy in-repo NAM
 converter.
 
-## GP-150 (read-only for now)
+## GP-150
 
-The Explorer can also read a **Valeton GP-150**. The GP-150 doesn't speak the GP-5/GP-50
-protocol, so it has its own preset codec (`app/static/prst150.js`,
+The Explorer also reads and writes a **Valeton GP-150** over USB. The GP-150 doesn't
+speak the GP-5/GP-50 protocol, so it has its own preset codec (`app/static/prst150.js`,
 `patch/prst150_format.py`) and its own MIDI transport (`app/static/ht_proto.js` +
 `ht_transport.js`, `patch/ht_proto.py`). The rest of the app picks them up through the
 device profile.
 
-**Supported:**
+**Supported.** Everything in this list was run on a real GP-150 on 2026-10-04 unless it
+says otherwise ([`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md)).
 
 - **Scan and browse all 200 preset slots**: name, the **12-block** chain (NR, PRE, WAH,
-  DST, N→S, AMP, CAB, EQ, MOD, DLY, RVB, VOL) in its stored order, models and parameters.
-  A slot that stays silent is listed with no name (stored locally as the factory
-  "New GEN." blank). A scan reads all 200 slots one by one and waits about 1.5 s on
-  each empty slot, so expect it to take longer than a GP-50 scan.
-- **AMP is locked first.** The pedal keeps AMP at chain position 0. The chain view pins
-  it there, and the codec refuses any block order that doesn't start with AMP.
-- **Back up / export**: **⬇ Download edited .prst** with no edits saves the preset as
-  its 1128-byte `.prst`, byte-for-byte what the pedal sent. Browser edits download the
-  same way, but no edited GP-150 file has been loaded on a pedal yet.
-- **Model names** come from a prebuilt GP-150 catalog (`patch/fxid_ring_gp150.json`).
-  `patch/build_ring.py gp150` regenerates it from the public format notes plus a local
-  Valeton Suite install; Valeton's `module150_data.json` itself is never committed. A
-  type code that isn't mapped yet shows as `Type <n>`.
+  DST, N→S, AMP, CAB, EQ, MOD, DLY, RVB, VOL) in its stored order, models and
+  parameters. A scan reads the slots one by one: about 70 s for 200 presets.
+- **Back up / export**: **⬇ Download edited .prst** with no edits saves a preset as its
+  1128-byte `.prst`, byte-for-byte what the pedal sent. `patch/ht_scan.py scan` saves
+  all 200 slots to `device_scan_gp150/` ([`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md)).
+- **Rename** (up to 13 characters), **parameter edits** (block knobs, Patch VOL) and
+  **bypass** (block on/off), in the Explorer's Live edit.
+- **Block order**: drag blocks in the chain strip. **AMP stays first and VOL last**, and
+  the codec refuses any other order. A reorder rewrites only the preset's order table,
+  which is what the pedal does when you reorder on the pedal: the block records and
+  their engine bytes never move. The reorder bytes were checked on the pedal (written
+  from Python); the drag itself was only tested in automated Chromium.
+- **Model change**: pick another model for a block by its GP-150 name. Picking "None"
+  also turns the block off. The names come from a prebuilt catalog
+  (`patch/fxid_ring_gp150.json`). `patch/build_ring.py gp150` regenerates it from the
+  public format notes plus a local Valeton Suite install; Valeton's `module150_data.json`
+  itself is never committed. A type code that isn't mapped yet shows as `Type <n>`.
+- **Clear Preset**: resets a slot to the factory "New GEN." blank.
+- **Import a `.prst` to a slot**: every write sends the whole 1128-byte preset with the
+  import stream Valeton Suite uses for a `.prst` file, about 1 s per preset. Copy/Paste,
+  Swap and preset reorder in the Explorer send the same stream, but they weren't each
+  run on the pedal. To write a file from disk (needs `.venv-midi`, see
+  [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md)), run this from the repo root:
 
-**Not yet:**
+  ```python
+  from patch import device_write as dw, ht_scan
+  prst = open("my-preset.prst", "rb").read()
+  slot = 42  # internal slot 0..199; the pedal shows it as preset 043
+  with ht_scan.Session() as s:
+      assert s.hello(), "no handshake: close Valeton Suite"
+      pk = dw.build_gp150_write_stream(prst, slot)
+      ok, why = dw.validate_gp150_stream(pk, slot=slot)
+      dw.send_stream(None, pk, confirm=True, validated=ok, session=s)
+  ```
+- **Select a preset**: with the pedal connected, clicking a preset row switches the pedal
+  to that preset. The select request was checked on the pedal from Python.
 
-- **Writing to the pedal is not available yet.** Rename, parameter and bypass edits,
-  live edit, block or preset reorder, Clear Preset and every other write can't reach a
-  GP-150. Every write path refuses (`WRITE_VERIFIED["gp150"] = False`) until the import
-  stream has been verified on hardware.
-- **SnapTone / IR catalog**: the request that reads the GP-150's capture and IR names
-  hasn't been decoded, so the Captures & IRs features (names, usage lookup, build from
-  a capture) are GP-5/GP-50 only for now.
+**Not supported:**
+
+- **SnapTone / IR upload, and SnapTone / IR names**: the request that reads the
+  GP-150's capture and IR catalog hasn't been decoded, so the Captures & IRs features
+  (names, usage lookup, build from a capture) are GP-5/GP-50 only.
 - **Conversion**: the Preset Converter refuses GP-150 files (different effect catalog).
   GP-5 ↔ GP-50 conversion is unchanged.
+- **Bluetooth**: USB only.
+- **WAH model picks**: no preset read so far has a real wah, so the wah's engine byte
+  isn't known and the editor refuses the pick. To teach it: set a wah on the pedal and
+  save, rescan (`patch/ht_scan.py scan`), run `python3 scripts/gp150_engines.py` (it
+  rewrites `patch/gp150_engines.json`), and copy the new table into `ENGINES` in
+  `app/static/prst150.js` (`app/tests/test_prst150_js.mjs` fails until the two match).
 
-**Using it:** Chrome or Edge, GP-150 on **USB** (Bluetooth isn't supported). **Close
-Valeton Suite if the handshake fails**: it holds the MIDI port. If it still fails,
-unplug and replug the USB cable. The GP-150 path runs in the backend-free static mode,
-so use the static build (`node scripts/build_static_site.mjs`, then serve `dist/`;
-the GP-150 catalog is already in `app/static/data/`) or, on the local server, open
+**Known quirks:**
+
+- **After writing the active preset, re-select it on the pedal** (turn the preset knob
+  away and back). The pedal stores the write at once, but keeps playing the old version
+  until it reloads the preset, so a Live edit isn't heard until you re-select.
+- **The pedal's chain screen draws AMP in a fixed middle position**, whatever the
+  stored order. The Explorer shows the stored order, with AMP first.
+- **A power-cycled pedal streams nothing until the host opens a session**: it
+  acknowledges preset reads and then stays silent. The app and the CLI send Valeton
+  Suite's session-open message after the handshake, so you don't need to do anything.
+- **Chain-strip drag**: in one Chrome install the chips didn't start dragging on a quick
+  click-and-move (automated Chromium drags fine). Press and hold a chip for a moment,
+  then move it.
+- **BPM above 255**: only the low byte of the tempo (`0x24`) is decoded, and the
+  Explorer's BPM slider goes to 300. Keep a GP-150 preset's BPM at 255 or below.
+- **Numbering**: the Explorer and the scripts number slots 0–199. The pedal and Valeton
+  Suite number presets from 001, so slot 199 is preset 200 on the pedal.
+
+**Using it:** Chrome or Edge, GP-150 on **USB**. **Close Valeton Suite if the handshake
+fails**: it holds the MIDI port. If it still fails, unplug and replug the USB cable. The
+GP-150 path runs in the backend-free static mode, so use the static build
+(`node scripts/build_static_site.mjs`, then serve `dist/`; the GP-150 catalog is already
+in `app/static/data/`) or, on the local server, open
 `http://127.0.0.1:8756/explorer?static=1`. The FastAPI backend's device routes are
-GP-5/GP-50 only. Then click **⟳ Scan device** (or **⟳ Rescan device** when a
-preset list is already shown). The Chrome 152 known issue under
-[Run](#run) is a Web MIDI SysEx bug, so expect it to hit the GP-150 too.
+GP-5/GP-50 only. Then click **⟳ Scan device** (or **⟳ Rescan device** when a preset
+list is already shown). The Chrome 152 known issue under [Run](#run) is a Web MIDI
+SysEx bug, so expect it to hit the GP-150 too.
 
-**How it was reverse-engineered:** the GP-150 ignores the GP-5/GP-50 requests and the
-Universal Device Inquiry. It speaks the GP-180's "HT" SysEx protocol, which
-[majabojarska/Valeton-GP180-Rev-Eng](https://github.com/majabojarska/Valeton-GP180-Rev-Eng)
-captured from Valeton Suite. The framing, both CRCs, the preset-read request and the
-chunked reply stream were worked out from that capture corpus. The 1128-byte preset
-layout comes from the public
-[GP150_PRST_FORMAT.md](https://gist.github.com/AlbertoBarba/ec59feecba60ca956eeb6970f0ac0055)
-analysis. The read path (handshake, preset read, chunk stream, and the immediate ACK of
-the final chunk that the pedal needs) was verified against a real GP-150 over USB with
-throwaway probe scripts during reverse-engineering. The probes are in `re/gp150/probes/`,
-and their logs plus three presets read off the pedal are in `re/gp150/evidence/`. The
-app's own scanners (the browser scan and the `patch/ht_scan.py` CLI) have only been
-tested against a simulated pedal so far: **the full 200-slot scan and the Chrome
-checklist in [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md) are still pending.**
+**Hardware verification** (one GP-150, USB PID 0x0186, firmware version not recorded;
+macOS, Valeton Suite closed):
+
+| Date | What ran on the pedal | Result |
+|---|---|---|
+| 2026-10-03 | Throwaway probes: handshake, preset read, chunk stream, the immediate ACK of the final chunk | Three presets read off the pedal; reads don't change the active preset ([`re/gp150/probes/`](re/gp150/probes/), [`re/gp150/evidence/`](re/gp150/evidence/)) |
+| 2026-10-04 | `patch/ht_scan.py scan` (after adding the session open) | 200/200 presets in 70 s; byte `0x04` == slot for 200/200 ([`DEVICE_READ.md`](re/gp150/DEVICE_READ.md)) |
+| 2026-10-04 | `patch/ht_write_verify.py 199 --placeholder` | 7/7 steps PASS: import ACKed and confirmed by the pedal's 0x08 "import done", read-back identical outside the device-owned bytes, original restored, active preset untouched |
+| 2026-10-04 | Edit checklist on slots 199 and 185 | All PASS. In the Explorer: rename, Patch VOL, DLY model change + on (echo audible), Clear on slot 185 (== factory blank). From Python with the codec's bytes: block reorder (echo audible; the Explorer then showed the stored order) and select. Both slots restored byte-identical from the scan backup |
+
+The checklist found one bug, now fixed: the first codec moved block records on a
+reorder, which silenced the preset. A reorder done on the pedal itself showed that only
+the order table changes, so the codec now does the same.
+
+**How it was reverse-engineered, and credits:** the GP-150 ignores the GP-5/GP-50
+requests and the Universal Device Inquiry. It speaks the GP-180's "HT" SysEx protocol.
+
+- [majabojarska/Valeton-GP180-Rev-Eng](https://github.com/majabojarska/Valeton-GP180-Rev-Eng)
+  (GPL-3) captured Valeton Suite talking to a GP-180. The framing, both CRCs, the
+  preset-read and import requests, the chunked stream and the session open were worked
+  out from those captures and its SysEx corpus. Nothing from it is vendored, except 35
+  captured messages used as byte-exact test vectors
+  (`app/tests/fixtures/gp150/ht_corpus.json`, each with its capture file and frame).
+  The tests read its 200-preset dump only from a separate checkout (`GP180_DUMP_DIR`).
+- AlbertoBarba's public
+  [GP150_PRST_FORMAT.md](https://gist.github.com/AlbertoBarba/ec59feecba60ca956eeb6970f0ac0055)
+  documents the 1128-byte preset layout and the effect type tables. The pedal showed two
+  corrections: block records sit at fixed indexes and only the order table moves, and
+  the engine byte belongs to the effect, not to its chain position.
+
 Details: [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md) (wire facts, read rules,
-CLI) and the [design spec](docs/superpowers/specs/2026-10-03-gp150-support-design.md).
+CLI), [`re/gp150/DEVICE_WRITE.md`](re/gp150/DEVICE_WRITE.md) (write verification and
+the Explorer checklist) and the
+[design spec](docs/superpowers/specs/2026-10-03-gp150-support-design.md).
 
 ## Maintenance status: no test hardware
 
@@ -115,6 +177,9 @@ If you open an issue about talking to the pedal, please include:
 - If you can, a raw MIDI capture of the failure, e.g. with
   [MIDI Monitor](https://www.snoize.com/midimonitor/) on macOS. This is the single most
   useful thing you can attach.
+- **GP-150 owners:** the output of `./.venv-midi/bin/python patch/ht_scan.py read active`
+  (with Valeton Suite closed; setup in [`re/gp150/DEVICE_READ.md`](re/gp150/DEVICE_READ.md)),
+  plus the `.prst` file it saves under `device_scan_gp150/`.
 
 ## Getting NAM captures onto the pedal
 
@@ -211,7 +276,8 @@ Then open **http://127.0.0.1:8756**.
 ## Scope
 
 Live device read/write (Explorer, live edit, reorder, rename, clear, capture usage,
-build/make-template) is reverse-engineered and working over WebMIDI. The GP-150 is
-read-only for now ([GP-150](#gp-150-read-only-for-now)). The app only
+build/make-template) is reverse-engineered and working over WebMIDI. The GP-150 has
+scan, backup, edits, block order, clear and preset writes, but no SnapTone/IR features
+([GP-150](#gp-150)). The app only
 talks to the physical pedal when you explicitly connect and scan/write via the
 Explorer or Captures & IRs pages.

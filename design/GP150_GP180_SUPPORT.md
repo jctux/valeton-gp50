@@ -1,3 +1,12 @@
+> **DONE** — GP-150 support is implemented; see the spec
+> [`docs/superpowers/specs/2026-10-03-gp150-support-design.md`](../docs/superpowers/specs/2026-10-03-gp150-support-design.md)
+> and the plan [`docs/superpowers/plans/2026-10-03-gp150-support.md`](../docs/superpowers/plans/2026-10-03-gp150-support.md).
+> Corrections found on the pedal (2026-10-04): block records sit at **fixed home
+> records** per slot and a reorder rewrites only the order table at 0x78 (the engine
+> byte belongs to the effect, not to its chain position); and a power-cycled pedal
+> needs Valeton Suite's family-0x0C **session open** after the handshake before it
+> streams presets. The research below is kept as it was written.
+
 # Adding GP-150 / GP-180 support — research + roadmap
 
 Research done 2026-07-22. Everything below is **already established** — pick this up

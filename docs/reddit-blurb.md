@@ -18,3 +18,7 @@ Congrats on the pickup. Two free tools I built to help me with my own GP-50, bot
 
 Same tools, swap the GP-50 mentions — the editor is device-aware and the converter is
 device-agnostic, so both apply to the GP-5 unchanged.
+
+## GP-150 variant
+
+The editor reads and writes the GP-150 too, over USB: scan, back up, rename, edit params and models, reorder blocks and clear presets. GP-150 SnapTone/IR names and GP-5/GP-50 conversion aren't supported yet.

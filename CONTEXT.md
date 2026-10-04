@@ -11,29 +11,51 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
   that differ between the siblings: 20-byte header, .prst length (507 vs 552), and
   the 0xFF-block device tag; plus `slots`/`transport`/`n_blocks` (100/"legacy"/10
   for both siblings). `prst_format.detect()` identifies a .prst's device.
-  Reads/scans/conversions work on both. Device WRITE is capture-verified only for
-  the GP-50 (`device_write.WRITE_VERIFIED`); a GP-5 write reuses the GP-50 opcodes
-  on faith and is gated behind `allow_unverified` until a GP-5 import is captured.
+  Reads/scans/conversions work on both. Device WRITE is capture-verified for the
+  GP-50 and hardware-verified for the GP-150 (`device_write.WRITE_VERIFIED`); a GP-5
+  write reuses the GP-50 opcodes on faith and is gated behind `allow_unverified`
+  until a GP-5 import is captured.
 - **GP-150** — the third device (`prst_format.GP150`: 200 slots, transport `"ht"`,
   12 blocks). Not a GP-5/GP-50 sibling. **Container**: 1128 B, magic `11 30 64 04`,
   layout in `patch/prst150_format.py` / `app/static/prst150.js` (the "codec";
   callers get it from `PRST.codecFor(profile)`). **Protocol**: the GP-180 "HT"
   SysEx protocol (`patch/ht_proto.py` / `app/static/ht_proto.js`, browser session
   `ht_transport.js`, read-only CLI `patch/ht_scan.py`; see `re/gp150/DEVICE_READ.md`).
+  `hello()` = the handshake plus Valeton Suite's family-0x0C **session open**: a
+  power-cycled pedal ACKs reads but streams nothing until the session is open.
   No bulk name read: a scan reads every slot, and a slot that stays silent is
-  **empty** (stored as a nameless blank). **12 block slots** 0–11 named NR PRE WAH
-  DST N→S AMP CAB EQ MOD DLY RVB VOL. Each slot's 68-byte block record sits at a
-  **fixed home index** (record 0 AMP, 1 NR … 5 N→S, 6 CAB … 11 VOL); the 12-byte
-  order table at 0x78 lists slot indices by chain position, and **a reorder rewrites
-  only the order table** (hardware-verified 2026-10-04). **AMP (slot 5) is locked at
-  chain position 0** and VOL (slot 11) at 11: the codec refuses any other order. A
-  block's engine byte belongs to its effect (per (slot, type), `patch/gp150_engines.json`),
-  never to its chain position. A block names
-  its model by `(slot, type)`, where type is a per-slot enumeration (not an fxid low
-  byte). The ring `patch/fxid_ring_gp150.json` is keyed **`(slot << 24) | type`**;
-  an engine-0x06 block other than VOL is the "None" effect (VOL's normal engine is 0x06). **Read-only**:
-  `WRITE_VERIFIED["gp150"] = False` until the import stream is verified on
-  hardware. No conversion to or from the GP-5/GP-50.
+  **empty** (stored as a nameless blank).
+  - **Block slots** 0–11 are NR PRE WAH DST N→S AMP CAB EQ MOD DLY RVB VOL. Blocks
+    are keyed by slot everywhere (`blocks[k]`, edit specs, `blocksBySlot`).
+  - **Fixed home records**: each slot's 68-byte block record (12 records from 0x84)
+    sits at a fixed index whatever the chain order, `DEFAULT_POS` =
+    `[1,2,3,4,5,0,6,7,8,9,10,11]` for NR … VOL (record 0 AMP, 1 NR … 5 N→S, 6 CAB …
+    11 VOL).
+  - **Order table** (12 B at 0x78): slot ids by chain position, default
+    `[5,0,1,2,3,4,6,7,8,9,10,11]`. **A reorder rewrites only the order table**, as the
+    pedal's own reorder does (hardware, 2026-10-04). **AMP (slot 5) is locked at chain
+    position 0** and VOL (slot 11) at 11: the codec refuses any other order.
+  - **Engines per slot**: a block's engine byte (record +7) belongs to its effect,
+    never to its chain position, and is never recomputed on a reorder. A model change
+    takes the engine for that (slot, type) from `patch/gp150_engines.json` (learned
+    from scanned presets by `scripts/gp150_engines.py`; the JS copy `ENGINES` in
+    `prst150.js` is synced by hand, and `test_prst150_js.mjs` fails until it matches).
+    An engine-0x06 block other than VOL is the "None" effect (type 3, off); VOL's
+    normal engine is 0x06. No real WAH engine is known, so a WAH model pick is refused.
+  - **Models**: a block names its model by `(slot, type)`, where type is a per-slot
+    enumeration (not an fxid low byte). The ring `patch/fxid_ring_gp150.json` is keyed
+    **`(slot << 24) | type`**.
+  - **Device-written bytes**: 0x0A (the import stream carries 0x5C, the pedal stores
+    0x58), 0x0D..0x0F (written by the pedal; it accepts zeros), 0x43C ("saved on the
+    pedal" flag) and 0x445 (enable bits: bit0 MOD, bit1 DLY, bit2 RVB, bit3 VOL). The
+    codec never writes them, and read-back compares ignore them. No file CRC.
+  - **Write** = a whole-preset import into one slot (family-0x70 stream, the same one
+    Valeton Suite sends to import a `.prst`; the slot comes from byte 0x04). Both
+    gates are open: `device_write.WRITE_VERIFIED["gp150"]` and
+    `webmidi_write.WRITE_VERIFIED.gp150`, hardware-verified 2026-10-04
+    (`re/gp150/DEVICE_WRITE.md`). The pedal doesn't reload the active preset after an
+    import: re-select it on the pedal to hear the change.
+  - No conversion to or from the GP-5/GP-50.
 - **Patch** — one device preset slot (index 0–99; 0–199 on the GP-150). Serialized
   as a **.prst** file (layout: `patch/prst_format.py`; 552 B on GP-50, 507 B on
   GP-5; GP-150 above). A patch whose name is the factory default (the device
@@ -65,7 +87,8 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
   SnapTone slots and User IRs, produced only by a live sync
   (`patch/read_bank_map.py`).
 - **Scan** — the ~60–90 s one-preset-at-a-time full read of the device into
-  `device_scan/` (no bulk read exists). **Sync** — the quick catalog/IR name
+  `device_scan/` (no bulk read exists; GP-150: about 70 s for 200 slots, into
+  `device_scan_gp150/` from `patch/ht_scan.py scan`). **Sync** — the quick catalog/IR name
   read that refreshes bank_map.
 - **Refit / A2→A1** — distilling a NAM A2 capture into the 0.5.x A1
   architecture the GP-50 accepts (a2a1/, the Convert page).
