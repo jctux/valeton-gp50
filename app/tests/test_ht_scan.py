@@ -66,8 +66,9 @@ class FakePedal:
     replies. Inbound frames are queued with a release time; `inp.iter_pending()`
     yields the due ones, like mido's non-blocking input."""
 
-    def __init__(self, presets=None, ack_silent=True, dead=False, drop_chunk=-1, on_read=None, on_hello=None):
+    def __init__(self, presets=None, ack_silent=True, dead=False, drop_chunk=-1, on_read=None, on_hello=None, needs_session=False, answers_session=True):
         self.presets = {0: None} if presets is None else presets  # None -> the corpus stream
+        self.needs_session, self.answers_session, self.session_open = needs_session, answers_session, False
         self.ack_silent, self.dead, self.drop_chunk = ack_silent, dead, drop_chunk
         self.on_read, self.on_hello = on_read, on_hello
         self.queue = []  # [(release_at, raw)]
@@ -112,6 +113,12 @@ class FakePedal:
             return self.emit(MSG["hello_reply"])
         if f.family == ht.FAMILY_ACK:
             return  # an ACK from the host
+        if f.family == ht.FAMILY_SESSION:  # the Suite's session-open: ACK (tx 0) + ident reply (tx 1)
+            self.emit(MSG["ack_tx0"])
+            if self.answers_session:
+                self.session_open = True
+                self.emit(MSG["ident_reply"], 0.002)
+            return
         if f.family == ht.FAMILY_PRESET_REQ:
             payload = ht.parse_logical(ht.dec(f.body[1:]))
             slot = payload[8] | (payload[9] << 8)
@@ -123,6 +130,8 @@ class FakePedal:
                     self.emit(ht.ack(f.tx4[3]))
                 return  # empty slot: silence (after the ACK, or with none at all)
             self.emit(ht.ack(f.tx4[3]))
+            if self.needs_session and not self.session_open:
+                return  # power-cycled pedal: ACK but no stream until the session is opened
             self.stream(self.stream_for(slot))
 
     def reqs(self):
@@ -566,3 +575,23 @@ def test_watch_prints_byte_diffs():
     slot_name = f150.SLOTS[f150.read_order(a)[pos]]
     assert any(f"pos {pos} ({slot_name}) block byte +0x04" in ln for ln in lines), lines
 
+
+
+# --- session open (power-cycled pedal, 2026-10-04) -------------------------------
+def test_hello_opens_the_session_and_acks_the_ident_reply():
+    p = FakePedal(needs_session=True); s = session(p)
+    assert s.hello() is True
+    assert ht.session_open() in p.sent, "hello() must send the Suite's 0x0C session-open"
+    assert p.acks_for(1), "the ident reply (tx 1) must be ACKed"
+    assert s.read(0) is not None and len(s.read(0)) == 1128
+
+
+def test_read_without_session_open_reads_as_empty_on_a_power_cycled_pedal():
+    # documents the symptom the fix prevents: ACK then silence
+    p = FakePedal(needs_session=True); s = session(p)
+    assert s.read(0) is None and s.last_status == "empty-acked"
+
+
+def test_hello_is_false_when_the_pedal_never_answers_the_session_open():
+    p = FakePedal(needs_session=True, answers_session=False); s = session(p)
+    assert s.hello() is False

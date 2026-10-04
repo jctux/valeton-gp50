@@ -28,6 +28,9 @@ FAMILY_ACK = 0x00
 FAMILY_PRESET_REQ = 0x0F
 FAMILY_PATCH = 0x70
 FAMILY_IMPORT_DONE = 0x08
+FAMILY_SESSION = 0x0C  # host -> device "session open" (the Suite's settings read); needed after a power cycle
+FAMILY_IDENT = 0x10  # device -> host ident reply to the session open (tx 1; the host ACKs it)
+SESSION_OPEN_PAYLOAD = bytes((0x03, 0x01, 0x70, 0x10, 0x70, 0x10, 0x02, 0x00))
 PRESET_LEN = 1128
 PAYLOAD_HEAD_EXPORT = b"\x03\x03\x11\x30"
 PAYLOAD_HEAD_IMPORT = b"\x01\x03\x11\x30"
@@ -126,6 +129,17 @@ def short_payload(f: Frame) -> bytes:
 
 def short_message(family: int, tx_id: int, payload: bytes) -> bytes:
     return frame(family, bytes((0, 0, 0, tx_id & 0xFF)), b"\x00" + enc(logical(payload)))
+
+
+def session_open() -> bytes:
+    """The Suite's family-0x0C message sent right after the handshake. A power-cycled
+    GP-150 ACKs preset reads but streams nothing until it has seen this (2026-10-04);
+    the pedal answers with an ACK (tx 0) and an ident reply (family 0x10, tx 1)."""
+    return short_message(FAMILY_SESSION, 0, SESSION_OPEN_PAYLOAD)
+
+
+def is_ident_reply(f: "Frame") -> bool:
+    return f.family == FAMILY_IDENT and not is_chunk(f)
 
 
 def hello() -> bytes:

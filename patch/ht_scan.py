@@ -160,6 +160,7 @@ class Session:
         self.settle, self.timeout, self.empty_timeout, self.idle, self.tick = settle, timeout, empty_timeout, idle, tick
         self.log: Log = log or _default_log
         self.tx = 0x10
+        self.session_opened = False
         self.bad_frames = 0
         self.last_status: Optional[str] = None  # "preset" | "empty-acked" | "empty-unacked" after read()
         if opened and open_delay:
@@ -345,9 +346,16 @@ class Session:
         return r
 
     def hello(self) -> bool:
-        """The handshake; True when the pedal answers `00 02 03 00`."""
+        """The handshake, then the Suite's session open. True when the pedal answers
+        `00 02 03 00` AND replies to the 0x0C session open with its ident (family 0x10).
+        A power-cycled pedal ACKs reads but streams nothing until the session is open
+        (seen 2026-10-04); the ident reply carries tx 1 and is ACKed by _frames()."""
         r = self.exchange(ht.hello(), until=_is_handshake_reply)  # an unsolicited 0x18 must not end it
-        return any(_is_handshake_reply(f) for f in r.frames)
+        if not any(_is_handshake_reply(f) for f in r.frames):
+            return False
+        o = self.exchange(ht.session_open(), until=ht.is_ident_reply)
+        self.session_opened = any(ht.is_ident_reply(f) for f in o.frames)
+        return self.session_opened
 
     def read(self, slot: int) -> Optional[bytes]:
         """Read one preset without selecting it (flag 01). Returns the 1128-byte

@@ -87,3 +87,13 @@ def test_short_payload_reads_requests_and_the_import_notify():
         ht.short_payload(ht.parse_frame(MSG["import_stream_slot1_0"]))  # a chunk
     with pytest.raises(ValueError):
         ht.short_payload(ht.parse_frame(MSG["import_done_ack"]))  # an ACK has no logical message
+
+
+def test_session_open_matches_the_suite_capture():
+    # After a power cycle the pedal ACKs preset reads but streams nothing until the
+    # Suite's family-0x0C "session open" exchange has happened (seen 2026-10-04).
+    assert ht.FAMILY_SESSION == 0x0C and ht.FAMILY_IDENT == 0x10
+    assert ht.session_open() == MSG["settings_read"]
+    ident = ht.parse_frame(MSG["ident_reply"])
+    assert ident.family == ht.FAMILY_IDENT and ident.tx4[3] == 1 and ht.is_ident_reply(ident)
+    assert not ht.is_ident_reply(ht.parse_frame(MSG["hello_reply"]))
