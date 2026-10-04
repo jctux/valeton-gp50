@@ -62,12 +62,15 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
 - **Container**: 1128 bytes, documented in the gist
   `AlbertoBarba/GP150_PRST_FORMAT.md` (hardware-confirmed). Header: magic `11 30 64 04`,
   index at `0x04` (0–199), BPM `0x24`, patch volume `0x26`, name ASCII NUL-padded at
-  `0x2C..0x6F`, chain order 12 × u8 at `0x78` (slot indices: 0 NR, 1 PRE, 2 WAH, 3 DST,
-  4 N→S, 5 AMP, 6 CAB, 7 EQ, 8 MOD, 9 DLY, 10 RVB, 11 VOL; position 0 is always AMP).
-  Blocks: 12 × 68 bytes from `0x84`, stored in chain order: `[enabled][00 00 00][type]
-  [subtype][ext][engine] + 15 × float32 LE`. Footer 180 bytes at `0x3B4` (control
-  assignments; copy verbatim). `0x0D..0x0F` is device-written, not a checksum; the
-  pedal accepts zeros. No file CRC.
+  `0x2C..0x6F`, order table 12 × u8 at `0x78` = slot ids by chain position (slot
+  indices: 0 NR, 1 PRE, 2 WAH, 3 DST, 4 N→S, 5 AMP, 6 CAB, 7 EQ, 8 MOD, 9 DLY, 10 RVB,
+  11 VOL; position 0 is always AMP, position 11 always VOL). Blocks: 12 × 68-byte
+  records from `0x84` at **fixed indexes per slot** (see "Block records" below):
+  `[enabled][00 00 00][type][subtype][ext][engine] + 15 × float32 LE`. Footer 180 bytes
+  at `0x3B4` (control assignments; copy verbatim). `0x0D..0x0F` is device-written, not a
+  checksum; the pedal accepts zeros. `0x43C` ("saved on the pedal" flag) and `0x445`
+  (enable bits: bit0 MOD, bit1 DLY, bit2 RVB, bit3 VOL) are device-owned too: the host
+  never writes them and read-back compares ignore them. No file CRC.
 - **GP-150 vs GP-180 factory presets** (slot 0 vs `001-New GEN.prst`, slot 99 vs
   `100-Finger AC.prst`): identical except header `0x0D-0x0F` and footer control bytes
   (`0x448-0x460`, GP-180 has a third footswitch). The GP-180 dump is therefore a valid
@@ -83,6 +86,30 @@ offline against the GP-180 capture corpus (`majabojarska/Valeton-GP180-Rev-Eng`,
 
 Evidence files: `re/gp150/evidence/` (probe logs, read presets), `re/gp150/probes/`
 (the throwaway probe scripts that produced them).
+
+> **Block records and engines (verified 2026-10-04; supersedes the "blocks stored in
+> chain order" reading and the public analysis's per-position engine rule).** The pedal's
+> own reorder of a preset (RVB moved to chain position 6 on the pedal and saved,
+> `re/gp150/evidence/199-reordered-by-pedal.prst` vs `199-before-pedal-reorder.prst`)
+> changed ONLY the order table bytes `0x7E..0x82` (plus the device-written `0x0E/0x0F`);
+> no block record moved. So each slot's
+> record sits at its **home index** `DEFAULT_POS[slot]` = `[1,2,3,4,5,0,6,7,8,9,10,11]`
+> for NR … VOL (record 0 = AMP, 1 = NR, 2 = PRE, 3 = WAH, 4 = DST, 5 = N→S, 6 = CAB,
+> 7 = EQ, 8 = MOD, 9 = DLY, 10 = RVB, 11 = VOL), and the order table at `0x78` lists slot
+> ids by chain position (default `[5,0,1,2,3,4,6,7,8,9,10,11]`). A **reorder rewrites
+> only the order table**. The **engine byte** (record +7) belongs to the effect in the
+> slot and is never recomputed on a reorder; per slot it is one of NR {05}, PRE {03, 00},
+> WAH {— no real wah in any preset}, DST {07, 08}, N→S {00}, AMP {00, 01, 03},
+> CAB {1A, 0A}, EQ {01}, MOD {04, 01}, DLY {0B}, RVB {0C}, VOL {06}; the "None" effect
+> (type 3 outside VOL) is `0x06` and off. The variant depends on the effect type: the
+> codec takes it from `patch/gp150_engines.json` (learned per (slot, type) from the
+> user's 200-slot scan + evidence by `scripts/gp150_engines.py`; an unseen type gets the
+> slot's most common engine; a real WAH pick is refused). Moving records and giving a
+> moved block its new position's engine — what the codec did before — made the pedal
+> read the delay record as the reverb slot: no sound with engine `0x0C`, an inert delay
+> with `0x0B` (hardware, slot 199). Decoding by chain position also mislabelled the 8
+> distinct non-default-order presets (their engines fit the per-slot sets 12/12 only under the
+> fixed-record mapping).
 
 > **Session open (verified 2026-10-04).** After a power cycle the GP-150 ACKs preset reads but streams nothing until the host sends the Suite's family-0x0C message `F0 7F 25 0C 00 00 00 00 00 01 05 03 00 08 00 00 00 03 00 01 07 00 01 00 07 00 01 00 00 02 00 00 F7` (short message, tx 0, payload `03 01 70 10 70 10 02 00`) right after the handshake. The pedal answers with an ACK (tx 0) and an ident reply (family 0x10, tx 1) that the host ACKs. `hello()` = handshake + session open in both sessions.
 
@@ -125,11 +152,11 @@ Same method surface as `prst.js` so `patchlib.js`, `static_api.js`, `explorer.js
 | `detect(bytes)` | magic + len 1128 |
 | `readName/writeName` | `0x2C`, max 68 bytes, NUL-padded; UI caps at 13 chars |
 | `readVolBpm` / `writeVolBpm` | `0x26` / `0x24` (u8; BPM 40–300 stored low byte only — surface as read-only >255 caveat) |
-| `readOrder/writeOrder` | 12-byte chain order at `0x78`; AMP (5) locked at position 0; **blocks move with the order** (blocks are stored in chain order, unlike GP-50) |
-| `modelRecords` | 12 × `{pos, slot, type, subtype, ext, engine, enabled}` |
+| `readOrder/writeOrder` | 12-byte order table at `0x78` (slot ids by chain position); AMP (5) locked at position 0, VOL (11) at 11; **a reorder rewrites only the order table** — block records sit at fixed home indexes and never move (§2 "Block records") |
+| `modelRecords` | per slot, read from the slot's home record: `[type, slot, ext<<16 \| subtype<<8 \| type]`; `blocksBySlot` adds `{slot, rec, pos, enabled, engine, params}` (`pos` from the order table) |
 | `bypassMask` | from per-block `enabled` bytes |
 | `paramFloats` | 12 × 15 float32 |
-| `applyEdits` | name / vol / bpm / order / enabled / type / params; recompute `engine` per spec §6–7 rules; subtype/ext per type table |
+| `applyEdits` | name / vol / bpm / order / enabled / type / params, each addressing the slot's home record; a model change writes the type + the slot's engine for it (`slotEngine`, from `patch/gp150_engines.json`; None = `0x06` + off); order = order table only; engines never recomputed by position; device-owned bytes untouched |
 | `blankPrst(slot)` | factory "New GEN." header + footer template with index set, name "New GEN." |
 | `refixCrc` | no-op |
 | `rebuild(name, body)` | not applicable; stream yields the whole file |
@@ -224,7 +251,12 @@ user clicks Scan
 - `test_prst150_format.py` + `test_prst150_js.mjs`: byte-exact decode/encode round
   trip over the 200-file GP-180 dump (copied under `app/tests/fixtures/gp150/` only if
   the upstream license allows; otherwise fetched by a script) plus the GP-150 reads in
-  `re/gp150/evidence/`; `applyEdits` oracle JS vs Python.
+  `re/gp150/evidence/`; `applyEdits` oracle JS vs Python. Ground truth from the pedal
+  (2026-10-04): the order edit `[5,0,1,2,3,4,10,6,7,8,9,11]` on
+  `199-before-pedal-reorder.prst` reproduces `199-reordered-by-pedal.prst` outside
+  `0x0E/0x0F/0x43C/0x445`; the reordered evidence decodes DLY from record 9 (Sweet Echo,
+  `0x0B`, chain position 10) and RVB from record 10 (None, position 6); every evidence
+  engine fits its slot's set; a DLY model change lands in record 9 whatever the order.
 - Existing GP-5/GP-50 suites must stay green (no behaviour change for them).
 - Hardware checklist in `re/gp150/DEVICE_READ.md` / `DEVICE_WRITE.md` with the
   verification protocol of §3.6.

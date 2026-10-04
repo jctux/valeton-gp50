@@ -22,9 +22,13 @@ Use these terms exactly; they map 1:1 to modules and UI copy.
   `ht_transport.js`, read-only CLI `patch/ht_scan.py`; see `re/gp150/DEVICE_READ.md`).
   No bulk name read: a scan reads every slot, and a slot that stays silent is
   **empty** (stored as a nameless blank). **12 block slots** 0–11 named NR PRE WAH
-  DST N→S AMP CAB EQ MOD DLY RVB VOL. Blocks are stored in chain order, and the
-  12-byte order at 0x78 lists slot indices. **AMP (slot 5) is locked at chain
-  position 0**: the codec refuses any order that doesn't start with it. A block names
+  DST N→S AMP CAB EQ MOD DLY RVB VOL. Each slot's 68-byte block record sits at a
+  **fixed home index** (record 0 AMP, 1 NR … 5 N→S, 6 CAB … 11 VOL); the 12-byte
+  order table at 0x78 lists slot indices by chain position, and **a reorder rewrites
+  only the order table** (hardware-verified 2026-10-04). **AMP (slot 5) is locked at
+  chain position 0** and VOL (slot 11) at 11: the codec refuses any other order. A
+  block's engine byte belongs to its effect (per (slot, type), `patch/gp150_engines.json`),
+  never to its chain position. A block names
   its model by `(slot, type)`, where type is a per-slot enumeration (not an fxid low
   byte). The ring `patch/fxid_ring_gp150.json` is keyed **`(slot << 24) | type`**;
   an engine-0x06 block other than VOL is the "None" effect (VOL's normal engine is 0x06). **Read-only**:
