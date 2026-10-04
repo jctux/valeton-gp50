@@ -10,6 +10,9 @@
  *  - nameMax(key): 13 for the GP-150, 10 for GP-5/GP-50;
  *  - rowName(p, name): nameless empty slots read "(empty slot)";
  *  - blankFor(key, slot), emptySourceWrites(writes, names, key);
+ *  - the GP-150 chain strip: AMP pinned first, VOL pinned last (chainStripParts,
+ *    pinChainEnds: a drop after VOL lands before it); a "None" pick also turns the
+ *    block off (nonePick); a GP-150 preset needs a name (nameProblem);
  *  - explorer.js / explorer.html actually use them.
  *   node app/tests/test_explorer_edits_js.mjs
  */
@@ -101,7 +104,7 @@ for (const name of EVID) {
   // the bug this guards against: the GP-50 codec on a GP-150 file
   let legacy = null;
   try { legacy = PRST.applyEdits(base, SPECS[0][1]); } catch { legacy = null; }
-  check(`${name}: the GP-50 codec does NOT produce the GP-150 edit`, legacy === null || hex(legacy) !== oracle[`${name}|rename`]);
+  check(`${name}: the GP-50 codec does NOT produce the GP-150 edit`, legacy === null || hex(legacy) !== hex(Buffer.from(oracle[`${name}|rename`], "base64")));
 }
 
 // --- 2. what the picker edit means on the bytes -----------------------------------------
@@ -113,7 +116,11 @@ for (const name of EVID) {
   check("picker: DLY params = the ring defaults", dlyModel.params.every((pd) => Math.abs(dly.params[pd.algId] - resolveDefault(pd)) < 1e-6));
   check("picker: DLY engine from its position", dly.engine === C150.engineFor(dly.pos, 9, dly.type, dly.params));
   const none = C150.blocksBySlot(X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "mod-none")[1]))[8];
-  check("picker: MOD None -> type 3 + engine 0x06 (corpus None)", none.type === 3 && none.engine === 0x06);
+  check("picker: MOD None -> type 3 + engine 0x06 (corpus None), and off", none.type === 3 && none.engine === 0x06 && none.enabled === 0 && C150.blocksBySlot(base)[8].enabled === 1);
+  const noneOn = C150.blocksBySlot(X.buildEditedBytes(base, "gp150", explorerSpec({ models: { 8: modNone.fxid }, bypass: { 8: true } })))[8];
+  check("picker: MOD None + bypass on stays on", noneOn.type === 3 && noneOn.engine === 0x06 && noneOn.enabled === 1);
+  check("nonePick: the MOD None entry", X.nonePick("gp150", 8, modNone.fxid) === true);
+  check("nonePick: a real model / a real type 3 / GP-50", X.nonePick("gp150", 9, dlyModel.fxid) === false && X.nonePick("gp150", 3, ((3 << 24) | 3) >>> 0) === false && X.nonePick("gp50", 8, modNone.fxid) === false);
   const inv = lib.inventory([{ slot: 100, bytes: X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "mod-none")[1]) }]);
   check("picker: MOD None decodes as None", inv.patches[0].blocks[8].model === "None");
   let maxAlg = 0; for (const e of Object.values(ring)) for (const pd of e.params || []) maxAlg = Math.max(maxAlg, pd.algId);
@@ -145,6 +152,23 @@ for (const name of EVID) {
   check("nameMax gp50 = 10", X.nameMax("gp50") === 10);
   check("nameMax gp5 = 10", X.nameMax("gp5") === 10);
   check("nameMax default = 10", X.nameMax(null) === 10 && X.nameMax(undefined) === 10);
+  // a GP-150 preset needs a name: an empty one reads as an empty slot
+  for (const blank of ["", "   "]) {
+    check(`nameProblem gp150 ${JSON.stringify(blank)}`, /needs a name/.test(X.nameProblem("gp150", blank) || ""));
+    let err = null; try { X.buildEditedBytes(evidence("000-New_GEN.prst"), "gp150", explorerSpec({ name: blank })); } catch (e) { err = e; }
+    check(`buildEditedBytes gp150 refuses name ${JSON.stringify(blank)}`, err && /needs a name/.test(err.message), err && err.message);
+  }
+  {
+    const nameless = C150.blankPrst(7); C150.writeName(nameless, "");
+    let err = null; try { X.buildEditedBytes(nameless, "gp150", explorerSpec({ params: { 11: { 0: 60 } } })); } catch (e) { err = e; }
+    check("buildEditedBytes gp150 refuses a result with no name (nameless base, no rename)", err && /needs a name/.test(err.message), err && err.message);
+    check("... and accepts it once renamed", C150.readName(X.buildEditedBytes(nameless, "gp150", explorerSpec({ name: "Named", params: { 11: { 0: 60 } } }))) === "Named");
+  }
+  check("nameProblem: a name / no rename / GP-50 empty name are fine", X.nameProblem("gp150", "Lead") === null && X.nameProblem("gp150", null) === null && X.nameProblem("gp150", undefined) === null && X.nameProblem("gp50", "") === null);
+  {
+    const g5 = new Uint8Array(readFileSync(resolve(here, "fixtures/gp5/65-Puppy.prst"))), g50 = PRST.convert(g5, "gp50");
+    check("GP-50 empty name: unchanged (as PRST.applyEdits)", hex(X.buildEditedBytes(g50, "gp50", explorerSpec({ name: "" }))) === hex(PRST.applyEdits(g50, explorerSpec({ name: "" }))));
+  }
   const thirteen = "Thirteen Char";
   const named = X.buildEditedBytes(evidence("000-New_GEN.prst"), "gp150", explorerSpec({ name: thirteen }));
   check("a 13-char GP-150 name round-trips", thirteen.length === 13 && C150.readName(named) === thirteen);
@@ -170,6 +194,27 @@ for (const name of EVID) {
   check("emptySourceWrites gp50: never (GP-50 empties are named)", X.emptySourceWrites(writes, names, "gp50").length === 0);
 }
 
+// --- 4b. GP-150 chain strip: AMP pinned first, VOL pinned last -----------------------------
+{
+  const L150 = C150.layout, L50 = PRST.codecFor("gp50").layout;
+  const std = [5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11];
+  const parts = X.chainStripParts(std, L150);
+  check("strip: AMP head, VOL tail, 10 movable between", JSON.stringify(parts.head) === "[5]" && JSON.stringify(parts.tail) === "[11]" && JSON.stringify(parts.middle) === "[0,1,2,3,4,6,7,8,9,10]");
+  const p2 = X.chainStripParts([5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11], L150);
+  check("strip: middle keeps the chain order", JSON.stringify(p2.middle) === "[10,0,1,2,3,4,6,7,8,9]");
+  check("strip: every middle block is movable, AMP/VOL are not", p2.middle.every((i) => L150.MOVABLE_BLOCKS.has(L150.BLOCK_NAMES[i])) && !L150.MOVABLE_BLOCKS.has("AMP") && !L150.MOVABLE_BLOCKS.has("VOL"));
+  // a drop after VOL lands right before it; a drop before AMP lands right after it
+  check("pin: RVB dropped after VOL -> before VOL", JSON.stringify(X.pinChainEnds([5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 10], L150)) === "[5,0,1,2,3,4,6,7,8,9,10,11]");
+  check("pin: DLY dropped after VOL -> before VOL", JSON.stringify(X.pinChainEnds([5, 0, 1, 2, 3, 4, 6, 7, 8, 10, 11, 9], L150)) === "[5,0,1,2,3,4,6,7,8,10,9,11]");
+  check("pin: NR dropped before AMP -> after AMP", JSON.stringify(X.pinChainEnds([0, 5, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11], L150)) === "[5,0,1,2,3,4,6,7,8,9,10,11]");
+  check("pin: a valid order is unchanged", JSON.stringify(X.pinChainEnds([5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11], L150)) === "[5,10,0,1,2,3,4,6,7,8,9,11]");
+  const pinned = X.pinChainEnds([5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 10], L150);
+  check("pin: the pinned order is accepted by the codec", C150.readOrder(X.buildEditedBytes(evidence("000-New_GEN.prst"), "gp150", explorerSpec({ order: pinned }))).join() === pinned.join());
+  const g50order = [8, 0, 1, 2, 9, 3, 4, 5, 6, 7];
+  check("pin: GP-50 layout untouched", JSON.stringify(X.pinChainEnds(g50order, L50)) === JSON.stringify(g50order) && L50.lockedLast !== true);
+  check("patchlib: VOL is not movable on the GP-150", lib.inventory([{ slot: 0, bytes: evidence("000-New_GEN.prst") }]).patches[0].blocks[11].movable === false);
+}
+
 // --- 5. explorer.js / explorer.html are wired to the helpers -------------------------------
 {
   const js = readFileSync(resolve(root, "app/static/explorer.js"), "utf8");
@@ -181,6 +226,12 @@ for (const name of EVID) {
   check("explorer.js: rows labelled via rowName", (js.match(/rowLabel\(p\)/g) || []).length >= 2 && /ExplorerEdits\.rowName\(/.test(js));
   check("explorer.js: clear uses blankFor", /ExplorerEdits\.blankFor\(key, p\.slot\)/.test(js));
   check("explorer.js: reorder confirm names empty sources", /ExplorerEdits\.emptySourceWrites\(/.test(js));
+  check("explorer.js: strip built from chainStripParts", /ExplorerEdits\.chainStripParts\(order, L\)/.test(js));
+  check("explorer.js: dropped order pinned (AMP first, VOL last)", /setChainOrder\(p, window\.ExplorerEdits\.pinChainEnds\(chainOrderFromDom\(strip\), layoutOf\(\)\)\)/.test(js));
+  check("explorer.js: setChainOrder refuses VOL not last", /L\.lockedLast && order\[n - 1\] !== L\.VOL_INDEX/.test(js));
+  check("explorer.js: a drop past the end lands before the VOL tail", /\.chain-tail/.test(js));
+  check("explorer.js: a pending None pick shows the block off", /ExplorerEdits\.nonePick\(devKey\(\), blkIdx, e\.models\[blkIdx\]\)/.test(js) && (js.match(/blockActive\(p\.slot, /g) || []).length >= 3);
+  check("explorer.js: write/download refuse an empty GP-150 name", (js.match(/ExplorerEdits\.nameProblem\(devKey\(\), e\.name\)/g) || []).length >= 2);
   const at = (s) => html.indexOf(s);
   check("explorer.html loads explorer_edits.js after prst150.js and before explorer.js",
     at("explorer_edits.js") > at("prst150.js") && at("prst150.js") > 0 && at("explorer_edits.js") < at("/static/explorer.js"));

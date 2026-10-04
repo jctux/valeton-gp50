@@ -254,6 +254,15 @@
   }
   // Row label: the current name; a nameless empty slot (GP-150 scan) reads "(empty slot)".
   const rowLabel = (p) => window.ExplorerEdits.rowName(p, curName(p));
+  // A block's on/off as it will be written: a pending toggle wins; a pending GP-150
+  // "None" pick is off (the codec turns it off unless a toggle says otherwise); else
+  // the stored state.
+  function blockActive(slot, blkIdx, stored) {
+    const e = edits.get(slot);
+    if (e && e.bypass[blkIdx] !== undefined) return e.bypass[blkIdx];
+    if (e && e.models[blkIdx] !== undefined && window.ExplorerEdits.nonePick(devKey(), blkIdx, e.models[blkIdx])) return false;
+    return stored;
+  }
   // Current chain order (chain position -> model-record index). Pending reorder wins;
   // falls back to the decoded order, then canonical identity.
   function curOrder(p) {
@@ -602,8 +611,7 @@
     c.className = "chain-chip blk-" + b.block.replace(/[^a-z]/gi, "").toLowerCase() + (locked ? " locked" : " movable");
     c.dataset.rec = recIdx;
     if (!locked) c.draggable = true;
-    const e = getEdit(p.slot);
-    const active = e.bypass[recIdx] !== undefined ? e.bypass[recIdx] : b.active;
+    const active = blockActive(p.slot, recIdx, b.active);
     if (!active) c.classList.add("bypassed-chip");
     const name = blockDisplay(b.block);
     c.innerHTML = (locked ? "" : `<span class="chain-grip" aria-hidden="true">⠿</span>`) + `<span class="chain-name">${name}</span>`;
@@ -618,21 +626,26 @@
     lbl.className = "chain-strip-label";
     const L = layoutOf();
     lbl.innerHTML = L.lockedFirst
-      ? `Signal chain <span class="hint">— AMP stays first; drag the other blocks</span>`
+      ? `Signal chain <span class="hint">— AMP stays first${L.lockedLast ? " and VOL last; drag the blocks between them" : "; drag the other blocks"}</span>`
       : `Signal chain <span class="hint">— drag NR · PRE · MOD · DLY · RVB around the fixed amp core</span>`;
     wrap.appendChild(lbl);
     const strip = document.createElement("div");
     strip.className = "chain-strip";
     const order = curOrder(p);
     if (L.lockedFirst) {
-      // GP-150: AMP is pinned at chain position 0; every other block moves freely after it
-      const core = document.createElement("div");
-      core.className = "chain-core";
-      core.title = "AMP must stay at position 0";
-      const first = order[0];
-      if (p.blocks[first]) core.appendChild(chainChip(p, p.blocks[first], first, true));
-      strip.appendChild(core);
-      order.slice(1).forEach((recIdx) => { const b = p.blocks[recIdx]; if (b) strip.appendChild(chainChip(p, b, recIdx, false)); });
+      // GP-150: AMP pinned at chain position 0 and VOL at position 11 (locked head and
+      // tail groups); every block between them moves freely
+      const parts = window.ExplorerEdits.chainStripParts(order, L);
+      const pinned = (ids, cls, title) => {
+        const g = document.createElement("div");
+        g.className = `chain-core ${cls}`;
+        g.title = title;
+        ids.forEach((i) => { if (p.blocks[i]) g.appendChild(chainChip(p, p.blocks[i], i, true)); });
+        return g;
+      };
+      strip.appendChild(pinned(parts.head, "chain-head", "AMP must stay at position 0"));
+      parts.middle.forEach((recIdx) => { const b = p.blocks[recIdx]; if (b) strip.appendChild(chainChip(p, b, recIdx, false)); });
+      if (parts.tail.length) strip.appendChild(pinned(parts.tail, "chain-tail", "VOL must stay last"));
       wireChainDrag(p, strip);
       wrap.appendChild(strip);
       return wrap;
@@ -686,6 +699,7 @@
     const L = layoutOf(), n = L.N_BLOCKS;
     if (order.length !== n || new Set(order).size !== n) return; // guard: keep it a permutation
     if (L.lockedFirst && order[0] !== L.AMP_INDEX) return; // GP-150: AMP must stay at position 0
+    if (L.lockedLast && order[n - 1] !== L.VOL_INDEX) return; // GP-150: VOL must stay last
     const e = getEdit(p.slot);
     const base = (p.order && p.order.length === n) ? p.order : Array.from({ length: n }, (_, i) => i);
     e.order = order.every((v, i) => v === base[i]) ? null : order;
@@ -708,15 +722,17 @@
       ev.preventDefault();
       ev.dataTransfer.dropEffect = "move";
       let after = chainDragAfter(strip, ev.clientX);
-      // locked-first layout (GP-150): nothing may land before the AMP core
-      if (after && after.classList.contains("chain-core") && layoutOf().lockedFirst) after = after.nextElementSibling;
+      const L = layoutOf();
+      // pinned ends (GP-150): nothing lands before the AMP head or after the VOL tail
+      if (after && L.lockedFirst && after.classList.contains("chain-head")) after = after.nextElementSibling;
+      if (after == null && L.lockedLast) after = strip.querySelector(".chain-tail");
       if (after == null) strip.appendChild(dragging);
       else strip.insertBefore(dragging, after);
     });
     strip.addEventListener("dragend", () => {
       const chip = strip.querySelector(".dragging");
       if (chip) chip.classList.remove("dragging");
-      setChainOrder(p, chainOrderFromDom(strip));
+      setChainOrder(p, window.ExplorerEdits.pinChainEnds(chainOrderFromDom(strip), layoutOf()));
     });
   }
 
@@ -741,6 +757,7 @@
       const e = getEdit(p.slot);
       const v = nameInput.value;
       e.name = v === p.name ? null : v; // unchanged = no edit
+      nameInput.setCustomValidity(window.ExplorerEdits.nameProblem(devKey(), v) || ""); // GP-150: a preset needs a name
       refreshSaveBar(p);
       const hdr = nameInput.closest(".preset-row") && nameInput.closest(".preset-row").querySelector(".preset-name");
       if (hdr) hdr.textContent = window.ExplorerEdits.rowName(p, v || p.name); // live-update the header without a re-render
@@ -789,7 +806,7 @@
       if (!b.model && !b.params.length && !b0.model) return;
       const bd = document.createElement("div");
       bd.className = `block-detail blk-${b.block.replace(/[^a-z]/gi, "").toLowerCase()}`;
-      const active = e.bypass[blkIdx] !== undefined ? e.bypass[blkIdx] : b.active;
+      const active = blockActive(p.slot, blkIdx, b.active);
       if (!active) bd.classList.add("bypassed");
       // active blocks open by default, bypassed collapsed; caret flips it (XOR)
       const bkey = `${p.slot}:${blkIdx}`;
@@ -837,7 +854,7 @@
       sw.title = "Toggle block on/off";
       sw.addEventListener("click", (ev) => {
         ev.stopPropagation();
-        const next = !(e.bypass[blkIdx] !== undefined ? e.bypass[blkIdx] : b.active);
+        const next = !blockActive(p.slot, blkIdx, b.active);
         e.bypass[blkIdx] = next;
         renderPresets();
         liveKick(p.slot);
@@ -938,6 +955,8 @@
   async function downloadEdit(p) {
     const e = getEdit(p.slot);
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
+    const bad = window.ExplorerEdits.nameProblem(devKey(), e.name);
+    if (bad) { if (note) note.textContent = `Failed: ${bad}.`; return; }
     try {
       const r = await fetch("/api/device/edit", {
         method: "POST",
@@ -1047,6 +1066,8 @@
   async function writeToDevice(p) {
     const e = getEdit(p.slot);
     const note = listEl.querySelector(`.save-bar[data-slot="${p.slot}"] .save-note`);
+    const bad = window.ExplorerEdits.nameProblem(devKey(), e.name);
+    if (bad) { if (note) note.textContent = `Write cancelled: ${bad}.`; return; }
     const ans = await UI.promptDialog(
       `Write "${window.ExplorerEdits.rowName(p, p.name)}" directly to the pedal. Enter the target slot (0–${slotCount() - 1}) to OVERWRITE. Make sure Valeton Suite is closed.`,
       String(p.slot), "Next"

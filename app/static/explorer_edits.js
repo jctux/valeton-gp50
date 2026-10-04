@@ -17,6 +17,14 @@
   const codecOf = (key) => PRST.codecFor(keyOf(key));
   const isHt = (key) => { const p = PRST.DEVICES[keyOf(key)]; return !!(p && p.transport === "ht"); };
 
+  // Why a pending rename can't be written, or null. A GP-150 preset needs a name: an
+  // empty (or blank) one reads back as an empty slot. GP-5/GP-50: no rule, as before.
+  // `name` null/undefined = no rename.
+  function nameProblem(key, name) {
+    if (name == null || !isHt(key)) return null;
+    return String(name).trim() ? null : `a ${PRST.profileFor(keyOf(key)).name} preset needs a name (an empty name reads as an empty slot)`;
+  }
+
   // `prst` with the Explorer's pending edits (editsSpec), built by device `key`'s codec.
   // Returns a new array; the input is untouched.
   function buildEditedBytes(prst, key, edits) {
@@ -25,7 +33,35 @@
     if ((src.transport === "ht") !== isHt(key)) {
       throw new Error(`a ${src.name} preset cannot be edited as a ${PRST.profileFor(keyOf(key)).name} preset`);
     }
-    return codecOf(key).applyEdits(u, edits);
+    const C = codecOf(key);
+    const bad = nameProblem(key, edits && edits.name);
+    if (bad) throw new Error(bad);
+    const out = C.applyEdits(u, edits);
+    const unnamed = nameProblem(key, C.readName(out)); // e.g. a nameless (scan-empty) base with no rename
+    if (unnamed) throw new Error(unnamed);
+    return out;
+  }
+
+  // True when picking `fxid` for block `blkIdx` selects the codec's "None" model (the
+  // GP-150 codec also turns such a block off): the Explorer shows the block off too.
+  const nonePick = (key, blkIdx, fxid) => { const C = codecOf(key); return !!(C.isNoneModel && C.isNoneModel(blkIdx, fxid)); };
+
+  // The chain strip of a layout with pinned ends (GP-150: AMP first, VOL last): the
+  // locked head, the draggable middle (chain order kept) and the locked tail.
+  function chainStripParts(order, layout) {
+    const head = layout.lockedFirst ? [layout.AMP_INDEX] : [];
+    const tail = layout.lockedLast ? [layout.VOL_INDEX] : [];
+    const pinned = new Set([...head, ...tail]);
+    return { head, middle: order.filter((i) => !pinned.has(i)), tail };
+  }
+
+  // A chain order read back from the strip after a drop, with the pinned blocks put
+  // back at their ends: something dropped after VOL lands right before it, something
+  // dropped before AMP right after it. Layouts without pinned ends: unchanged.
+  function pinChainEnds(order, layout) {
+    if (!layout.lockedFirst && !layout.lockedLast) return order.slice();
+    const { head, middle, tail } = chainStripParts(order, layout);
+    return [...head, ...middle, ...tail];
   }
 
   // Longest preset name the editor allows: the codec layout's nameMax (GP-150: 13,
@@ -51,7 +87,7 @@
     return writes.filter((w) => !String(names[w.from] || "").trim());
   }
 
-  const API = { buildEditedBytes, nameMax, blankFor, rowName, emptySourceWrites, EMPTY_LABEL };
+  const API = { buildEditedBytes, nameMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, EMPTY_LABEL };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.ExplorerEdits = API;
 })(typeof self !== "undefined" ? self : this);

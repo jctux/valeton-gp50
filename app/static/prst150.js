@@ -11,17 +11,17 @@
   const PRST_LEN = 1128, IDX_OFF = 0x04, BPM_OFF = 0x24, VOL_OFF = 0x26, NAME_OFF = 0x2c, NAME_LEN = 0x44;
   const ORDER_OFF = 0x78, BLOCKS_OFF = 0x84, BLOCK_LEN = 0x44, N_BLOCKS = 12, N_PARAMS = 15, FOOTER_OFF = 0x3b4;
   const SLOTS = ["NR", "PRE", "WAH", "DST", "N->S", "AMP", "CAB", "EQ", "MOD", "DLY", "RVB", "VOL"];
-  const AMP_SLOT = 5;
+  const AMP_SLOT = 5, VOL_SLOT = 11; // pinned first / last (VOL: position 11's engine is 0x06, the "None" engine)
   const CANONICAL_ENGINE = [null, 0x05, 0x03, 0x07, 0x07, 0x00, 0x1a, 0x01, 0x04, 0x0b, 0x0c, 0x06];
   // The "None" effect: engine 0x06 at any chain position (corpus). Type 3 is None in
   // NONE_SLOTS (no real type 3 in the spec; the ring's per-slot "None" entries); AMP,
   // DST, DLY, RVB and VOL have a real type 3. VOL's "Volume" also carries 0x06 at pos 11.
-  const ENGINE_BYPASS = 0x06, VOL_SLOT = 11, NONE_TYPE = 3, NONE_SLOTS = [0, 1, 2, 4, 6, 7, 8];
+  const ENGINE_BYPASS = 0x06, NONE_TYPE = 3, NONE_SLOTS = [0, 1, 2, 4, 6, 7, 8];
   const ENGINE_OVERRIDES = { "0:16": 0x1a, "3:117": 0x08, "3:118": 0x08, "3:122": 0x08, "4:57": 0x07, "4:64": 0x07, "4:122": 0x08, "4:112": 0x1a, "6:60": 0x0a, "1:26": 0x00, "8:41": 0x01, "8:54": 0x01, "7:25": 0x04 };
   const layout = {
-    BLOCK_NAMES: SLOTS.slice(), MOVABLE_BLOCKS: new Set(SLOTS.filter((s) => s !== "AMP")),
-    PARAMS_PER_BLOCK: N_PARAMS, N_BLOCKS, AMP_INDEX: AMP_SLOT, NS_INDEX: 4, CAB_INDEX: 6,
-    lockedFirst: true, hasFootswitches: false, nsIsRegularBlock: true, emptyName: "",
+    BLOCK_NAMES: SLOTS.slice(), MOVABLE_BLOCKS: new Set(SLOTS.filter((s) => s !== "AMP" && s !== "VOL")),
+    PARAMS_PER_BLOCK: N_PARAMS, N_BLOCKS, AMP_INDEX: AMP_SLOT, VOL_INDEX: VOL_SLOT, NS_INDEX: 4, CAB_INDEX: 6,
+    lockedFirst: true, lockedLast: true, hasFootswitches: false, nsIsRegularBlock: true, emptyName: "",
     nameMax: 13, // editor cap (spec §3.2); the file holds up to 67 bytes
   };
 
@@ -56,6 +56,7 @@
     order = Array.from(order, Number);
     if (!isPermutation(order)) throw new Error("chain order must be a permutation of 0..11");
     if (order[0] !== AMP_SLOT) throw new Error("chain position 0 must be AMP (slot 5)");
+    if (order[N_BLOCKS - 1] !== VOL_SLOT) throw new Error("chain position 11 must be VOL (slot 11)");
     const cur = readOrder(b), blocks = {};
     cur.forEach((slot, pos) => { blocks[slot] = b.slice(blockOff(pos), blockOff(pos) + BLOCK_LEN); });
     order.forEach((slot, pos) => { b.set(blocks[slot], blockOff(pos)); });
@@ -74,6 +75,8 @@
     const ov = ENGINE_OVERRIDES[`${slot}:${type}`];
     return ov !== undefined ? ov : CANONICAL_ENGINE[pos];
   }
+  // the ring's per-slot "None" entry: type 3 in a NONE_SLOTS slot
+  const isNoneModel = (slot, key) => NONE_SLOTS.includes(Number(slot)) && (Number(key) & 0xff) === NONE_TYPE;
   const modelKey = (slot, type, subtype = 0, ext = 0) => ((slot << 24) | (ext << 16) | (subtype << 8) | type) >>> 0;
   const modelRecords = (b) => blocksBySlot(b).map((blk, s) => [blk.type, s, (blk.ext << 16) | (blk.subtype << 8) | blk.type]);
   const modelRecOffset = () => -1;
@@ -96,6 +99,7 @@
       setBlock(b, pos, { type: k & 0xff, subtype: (k >> 8) & 0xff, ext: (k >> 16) & 0xff });
       if (s === AMP_SLOT && ((k & 0xff) === 2 || (k & 0xff) === 7)) setBlock(b, pos, { ext: 1 });
       if (s === 4 && (k & 0xff) === 0) setBlock(b, pos, { subtype: 1 });
+      if (isNoneModel(s, k)) setBlock(b, pos, { enabled: 0 }); // every None block in the corpus is off; a bypass edit below may override
     }
     for (const [slot, ps] of Object.entries(edits.params || {})) for (const [i, v] of Object.entries(ps)) setParam(b, posOf[Number(slot)], Number(i), v);
     for (const [slot, on] of Object.entries(edits.bypass || {})) setBlock(b, posOf[Number(slot)], { enabled: on ? 1 : 0 });
@@ -104,8 +108,9 @@
     if (edits.name != null) writeName(b, String(edits.name));
     for (const slot of Array.from(new Set([...moved, ...remodeled])).sort((x, y) => x - y)) {
       const pos = posOf[slot];
-      // a "None" block that only moved stays None (engine 0x06 at any position)
-      if (!remodeled.has(slot) && slot !== VOL_SLOT && b[blockOff(pos) + 7] === ENGINE_BYPASS) continue;
+      // a "None" block (type 3 + engine 0x06) that only moved stays None (engine 0x06 at any position)
+      const o = blockOff(pos);
+      if (!remodeled.has(slot) && slot !== VOL_SLOT && b[o + 4] === NONE_TYPE && b[o + 7] === ENGINE_BYPASS) continue;
       refreshEngine(b, pos, slot);
     }
     return b;
@@ -115,8 +120,8 @@
   function blankPrst(slot = 0) { const b = b64bytes(BLANK_B64); writeIndex(b, Number(slot)); return b; }
 
   const API = {
-    key: "gp150", layout, MAGIC, PRST_LEN, NAME_OFF, NAME_LEN, ORDER_OFF, BLOCKS_OFF, BLOCK_LEN, N_BLOCKS, N_PARAMS, FOOTER_OFF, SLOTS, AMP_SLOT,
-    ENGINE_BYPASS, NONE_TYPE, NONE_SLOTS,
+    key: "gp150", layout, MAGIC, PRST_LEN, NAME_OFF, NAME_LEN, ORDER_OFF, BLOCKS_OFF, BLOCK_LEN, N_BLOCKS, N_PARAMS, FOOTER_OFF, SLOTS, AMP_SLOT, VOL_SLOT,
+    ENGINE_BYPASS, NONE_TYPE, NONE_SLOTS, isNoneModel,
     detect, readIndex, writeIndex, readName, writeName, readVolBpm, writeVolBpm, readOrder, writeOrder, isPermutation,
     blockAt, blocksBySlot, setBlock, setParam, engineFor, modelKey, modelRecords, modelRecOffset, bypassMask, paramFloats,
     fsOffset, readFootswitches, refixCrc, applyEdits, blankPrst, BLANK_B64,

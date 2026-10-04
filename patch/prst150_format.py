@@ -9,7 +9,8 @@ and the public GP150_PRST_FORMAT.md analysis):
   0x024  1   BPM (low byte of 40..300)
   0x026  1   patch volume 0..100
   0x02C  68  name, ASCII, NUL-terminated/padded
-  0x078  12  chain order: order[pos] = slot index (SLOTS); order[0] is always AMP (5)
+  0x078  12  chain order: order[pos] = slot index (SLOTS); order[0] is always AMP (5),
+             order[11] always VOL (11) (203/203 corpus files)
   0x084  12 x 68  blocks IN CHAIN ORDER: [enabled][0 0 0][type][subtype][ext][engine] + 15 f32 LE
   0x3B4  180 footer: controller assignments (copied verbatim)
 
@@ -37,7 +38,8 @@ FOOTER_OFF = 0x3B4
 
 SLOTS = ["NR", "PRE", "WAH", "DST", "N->S", "AMP", "CAB", "EQ", "MOD", "DLY", "RVB", "VOL"]
 AMP_SLOT = 5
-MOVABLE = [s for s in SLOTS if s != "AMP"]
+VOL_SLOT = 11  # pinned last: position 11's engine is 0x06, the "None" engine (see write_order)
+MOVABLE = [s for s in SLOTS if s not in ("AMP", "VOL")]
 
 # spec §6: canonical engine per chain POSITION (position 0 = AMP is computed)
 CANONICAL_ENGINE = [None, 0x05, 0x03, 0x07, 0x07, 0x00, 0x1A, 0x01, 0x04, 0x0B, 0x0C, 0x06]
@@ -51,8 +53,8 @@ ENGINE_OVERRIDES = {
     (8, 41): 0x01, (8, 54): 0x01,
     (7, 25): 0x04,
 }
-ENGINE_BYPASS = 0x06  # engine of the "None" effect, at any chain position (corpus)
-VOL_SLOT = 11  # VOL's real type 3 ("Volume") also carries engine 0x06 at position 11
+ENGINE_BYPASS = 0x06  # engine of the "None" effect, at any chain position (corpus); VOL's
+# real type 3 ("Volume") also carries it, at position 11
 # Slots whose type 3 is the "None" effect: the spec (App. A) has no real type 3 there,
 # and the catalog ring has a per-slot "None" entry (slot<<24 | 3). AMP/DST/DLY/RVB/VOL
 # have a real type 3, so a None block there is told apart only by engine 0x06.
@@ -143,12 +145,16 @@ def set_param(b: bytearray, pos: int, i: int, value: float) -> None:
 
 def write_order(b: bytearray, order: Sequence[int]) -> None:
     """Reorder the chain: moves each slot's 68-byte block to its new position and
-    rewrites the order table. order[0] must be AMP (the pedal mutes otherwise)."""
+    rewrites the order table. order[0] must be AMP (the pedal mutes otherwise) and
+    order[11] VOL: every corpus file has it there, and position 11's engine is 0x06,
+    so a real effect moved there would read back as "None"."""
     order = [int(x) for x in order]
     if sorted(order) != list(range(N_BLOCKS)):
         raise ValueError("chain order must be a permutation of 0..11")
     if order[0] != AMP_SLOT:
         raise ValueError("chain position 0 must be AMP (slot 5)")
+    if order[-1] != VOL_SLOT:
+        raise ValueError("chain position 11 must be VOL (slot 11)")
     cur = read_order(b)
     blocks = {slot: bytes(b[_block_off(pos):_block_off(pos) + BLOCK_LEN]) for pos, slot in enumerate(cur)}
     for pos, slot in enumerate(order):
@@ -179,6 +185,11 @@ def engine_for(pos: int, slot: int, type_: int, params: Sequence[float]) -> int:
     if (slot, type_) in ENGINE_OVERRIDES:
         return ENGINE_OVERRIDES[(slot, type_)]
     return CANONICAL_ENGINE[pos]
+
+
+def is_none_model(slot: int, key: int) -> bool:
+    """True for the ring's per-slot "None" entry (type 3 in a NONE_SLOTS slot)."""
+    return int(slot) in NONE_SLOTS and (int(key) & 0xFF) == NONE_TYPE
 
 
 def model_key(slot: int, type_: int, subtype: int = 0, ext: int = 0) -> int:
@@ -217,7 +228,8 @@ def _refresh_engine(b: bytearray, pos: int, slot: int) -> None:
 def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     """Explorer edit spec -> new bytes. Keys index blocks by SLOT (0..11). Engine
     bytes are recomputed only for blocks whose model changed or that moved; a "None"
-    block (engine 0x06, not VOL) that only moved keeps engine 0x06."""
+    block (type 3 + engine 0x06, not VOL) that only moved keeps engine 0x06. Picking
+    a "None" model also turns the block off unless the edit's bypass says otherwise."""
     _check(prst)
     edits = edits or {}
     b = bytearray(prst)
@@ -237,6 +249,8 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
             set_block(b, pos, ext=1)
         if int(slot) == 4 and (key & 0xFF) == 0:
             set_block(b, pos, subtype=1)  # empty N->S carries subtype 1 (spec App. A)
+        if is_none_model(int(slot), key):
+            set_block(b, pos, enabled=0)  # every None block in the corpus is off; a bypass edit below may override
     for slot, ps in (edits.get("params") or {}).items():
         for i, v in ps.items():
             set_param(b, pos_of[int(slot)], int(i), float(v))
@@ -248,7 +262,8 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
         write_name(b, str(edits["name"]))
     for slot in sorted(moved | remodeled):
         pos = pos_of[slot]
-        if slot not in remodeled and slot != VOL_SLOT and b[_block_off(pos) + 7] == ENGINE_BYPASS:
+        o = _block_off(pos)
+        if slot not in remodeled and slot != VOL_SLOT and b[o + 4] == NONE_TYPE and b[o + 7] == ENGINE_BYPASS:
             continue  # a "None" block that only moved stays None (engine 0x06 at any position)
         _refresh_engine(b, pos, slot)
     return bytes(b)
