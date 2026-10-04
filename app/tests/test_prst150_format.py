@@ -21,6 +21,20 @@ def _active():
     return open(os.path.join(ROOT, "re", "gp150", "evidence", "100-active.prst"), "rb").read()
 
 
+def _evidence(name):
+    return open(os.path.join(ROOT, "re", "gp150", "evidence", name), "rb").read()
+
+
+def _pedal_reordered():
+    """Slot 199 after the PEDAL moved RVB to chain position 6 and saved (2026-10-04)."""
+    return _evidence("199-reordered-by-pedal.prst")
+
+
+def _before_pedal_reorder():
+    """The pedal's read-back of slot 199 just before that reorder (DLY = Sweet Echo, on)."""
+    return _evidence("199-before-pedal-reorder.prst")
+
+
 def test_corpus_has_live_files():
     assert len(EVID) >= 3
 
@@ -39,19 +53,26 @@ def test_every_corpus_file_is_sane():
         b = open(path, "rb").read()
         assert f150.detect(b), path
         order = f150.read_order(b)
-        assert sorted(order) == list(range(12)) and order[0] == f150.AMP_SLOT, path
+        assert sorted(order) == list(range(12)) and order[0] == f150.AMP_SLOT and order[11] == f150.VOL_SLOT, path
         blocks = f150.blocks_by_slot(b)
         assert [blk["pos"] for blk in blocks] == [order.index(s) for s in range(12)]
+        assert [blk["rec"] for blk in blocks] == f150.DEFAULT_POS  # records never move
+        assert [blk["slot"] for blk in blocks] == list(range(12))
         for blk in blocks:
             assert blk["enabled"] in (0, 1) and len(blk["params"]) == 15
 
 
-def test_blocks_by_slot_matches_raw_layout():
-    b = _active()
-    amp = f150.block_at(b, 0)  # position 0 is AMP in every file
-    raw = b[0x84:0x84 + 0x44]
-    assert amp["enabled"] == raw[0] and amp["type"] == raw[4] and amp["engine"] == raw[7]
-    assert amp["params"][0] == pytest.approx(struct.unpack_from("<f", raw, 8)[0])
+def test_blocks_are_read_from_their_home_records():
+    b = _pedal_reordered()
+    for s, blk in enumerate(f150.blocks_by_slot(b)):
+        raw = b[0x84 + f150.DEFAULT_POS[s] * 0x44:][:0x44]
+        assert (blk["enabled"], blk["type"], blk["subtype"], blk["ext"], blk["engine"]) == (raw[0], raw[4], raw[5], raw[6], raw[7])
+        assert blk["params"][0] == pytest.approx(struct.unpack_from("<f", raw, 8)[0])
+        assert f150.block_of(b, s) == blk
+    amp = f150.block_of(b, f150.AMP_SLOT)
+    assert amp["rec"] == 0 and amp["pos"] == 0  # AMP: record 0, chain position 0
+    with pytest.raises(ValueError):
+        f150.block_of(b, 12)
 
 
 def test_model_records_and_bypass_follow_slot_order():
@@ -77,17 +98,15 @@ def test_name_write_round_trip_and_cap():
     assert len(f150.read_name(b)) == 0x44 - 1  # NUL-terminated inside the field
 
 
-def test_write_order_moves_blocks_and_requires_amp_first():
+def test_write_order_rewrites_only_the_order_table():
     b = bytearray(_active())
-    before = f150.blocks_by_slot(b)
+    before = bytes(b)
     new = [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11]  # RVB right after AMP
     f150.write_order(b, new)
     assert f150.read_order(b) == new
+    assert [i for i in range(len(b)) if b[i] != before[i]] == list(range(0x79, 0x83))
     after = f150.blocks_by_slot(b)
-    for s in range(12):  # every slot keeps its own bytes, only the position changes
-        a, z = dict(before[s]), dict(after[s]); a.pop("pos"); z.pop("pos")
-        assert a == z, s
-    assert after[10]["pos"] == 1
+    assert after[10]["pos"] == 1 and after[10]["rec"] == 10
     with pytest.raises(ValueError):
         f150.write_order(b, [0, 5, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11])
     with pytest.raises(ValueError):
@@ -95,9 +114,9 @@ def test_write_order_moves_blocks_and_requires_amp_first():
 
 
 def test_write_order_requires_vol_last():
-    # VOL sits at chain position 11 in every corpus file (203/203) and no other block
-    # ever does; position 11's canonical engine is 0x06, the "None" engine, so a real
-    # effect there would be indistinguishable from None. VOL is pinned last like AMP first.
+    # VOL is at chain position 11 in every corpus file (the user's 200 slots + the
+    # GP-180 factory dump); whether the firmware accepts it elsewhere is untested,
+    # so VOL is pinned last like AMP first.
     b = bytearray(_active())
     before = bytes(b)
     for bad in ([5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11, 10], [5, 11, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10]):
@@ -109,34 +128,31 @@ def test_write_order_requires_vol_last():
     assert "VOL" not in f150.MOVABLE and "AMP" not in f150.MOVABLE and len(f150.MOVABLE) == 10
 
 
-def test_engine_rules_from_spec():
-    # canonical by position; type overrides; AMP by type/params
-    assert f150.engine_for(3, 2, 4, [0.0] * 15) == 0x07
-    assert f150.engine_for(1, 0, 1, [0.0] * 15) == 0x05  # NR gate at pos 1
-    assert f150.engine_for(6, 6, 16, [0.0] * 15) == 0x1A  # CAB at pos 6
-    assert f150.engine_for(6, 6, 60, [0.0] * 15) == 0x0A  # acoustic cab override
-    assert f150.engine_for(0, 5, 1, [15, 50, 50, 10, 0, 0] + [0] * 9) == 0x00  # Tweedy base
-    assert f150.engine_for(0, 5, 1, [15, 50, 50, 60, 0, 0] + [0] * 9) == 0x03  # Tweedy presence>=50
-    assert f150.engine_for(0, 5, 1, [15, 50, 50, 10, 1, 0] + [0] * 9) == 0x01  # extended
-    assert f150.engine_for(0, 5, 33, [0.0] * 15) == 0x01
-    assert f150.engine_for(0, 5, 9, [0.0] * 15) == 0x03
+def test_slot_engine_from_the_table():
+    t = _engine_table()
+    for s, row in enumerate(t["slots"]):
+        for type_, eng in row["engines"].items():
+            assert f150.slot_engine(s, int(type_)) == eng, (row["slot"], type_)
+    assert f150.slot_engine(9, 13) == 0x0B  # DLY Sweet Echo
+    assert f150.slot_engine(10, 3) == 0x0C and f150.slot_engine(3, 3) == 0x07  # real type 3s
+    assert f150.slot_engine(8, 41) == 0x01 and f150.slot_engine(6, 60) == 0x0A
+    assert f150.slot_engine(11, 3) == 0x06  # VOL
+    # a type the corpus never shows: the slot's most common real engine
+    assert f150.slot_engine(4, 57) == 0x00 and f150.slot_engine(5, 3) == 0x00 and f150.slot_engine(9, 40) == 0x0B
+    # no preset holds a real wah: no engine is known, so a wah pick is refused
+    with pytest.raises(ValueError, match="WAH"):
+        f150.slot_engine(2, 4)
+    with pytest.raises(ValueError):
+        f150.slot_engine(12, 1)
 
 
-def test_engine_rules_reproduce_corpus():
-    bad = []
-    checked = 0
-    for path in CORPUS:
-        b = open(path, "rb").read()
-        order = f150.read_order(b)
-        for pos in range(12):
-            blk = f150.block_at(b, pos)
-            if not blk["enabled"] or pos == 0:
-                continue  # firmware keeps engines of disabled blocks; AMP is best effort
-            checked += 1
-            want = f150.engine_for(pos, order[pos], blk["type"], blk["params"])
-            if want != blk["engine"]:
-                bad.append((os.path.basename(path), pos, order[pos], blk["type"], blk["engine"], want))
-    assert len(bad) <= checked // 100 + 1, bad[:10]
+def test_slot_engine_none_model():
+    # type 3 is the "None" effect in the slots with no real type 3 (the ring's per-slot
+    # None entries, WAH included): engine 0x06
+    for slot in f150.NONE_SLOTS:
+        assert f150.slot_engine(slot, f150.NONE_TYPE) == 0x06, slot
+    assert set(f150.NONE_SLOTS) == {0, 1, 2, 4, 6, 7, 8}
+    assert not hasattr(f150, "engine_for") and not hasattr(f150, "CANONICAL_ENGINE")
 
 
 def test_apply_edits_round_trip():
@@ -150,64 +166,44 @@ def test_apply_edits_round_trip():
     assert len(out) == 1128 and f150.apply_edits(b, {}) == b
 
 
-def test_apply_edits_model_change_sets_type_and_defaults_untouched():
+def test_apply_edits_address_home_records_in_a_reordered_preset():
+    # 099-Finger_AC: NR sits at chain position 10, but its record is record 1
+    b = open(os.path.join(ROOT, "re", "gp150", "evidence", "099-Finger_AC.prst"), "rb").read()
+    assert f150.read_order(b).index(0) == 10
+    out = f150.apply_edits(b, {"params": {0: {1: 12.5}}, "bypass": {0: True}})
+    diff = [i for i in range(len(b)) if b[i] != out[i]]
+    rec1 = 0x84 + 1 * 0x44
+    assert diff and all(rec1 <= i < rec1 + 0x44 for i in diff), [hex(i) for i in diff]
+    nr = f150.blocks_by_slot(out)[0]
+    assert nr["enabled"] == 1 and nr["params"][1] == pytest.approx(12.5) and nr["pos"] == 10
+
+
+def test_apply_edits_model_change_sets_type_and_engine():
     b = _active()
     key = f150.model_key(9, 4, 0, 0)  # DLY type 4
     out = f150.apply_edits(b, {"models": {9: key}})
     blk = f150.blocks_by_slot(out)[9]
     assert (blk["type"], blk["subtype"], blk["ext"]) == (4, 0, 0)
     assert blk["engine"] == 0x0B
+    with pytest.raises(ValueError, match="WAH"):
+        f150.apply_edits(b, {"models": {2: f150.model_key(2, 4)}})  # a real wah: engine unknown
 
 
-def test_apply_edits_reorder_recomputes_moved_engines():
-    b = _active()
-    before = f150.blocks_by_slot(b)
-    old = f150.read_order(b)
-    new = [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11]
-    out = f150.apply_edits(b, {"order": new})
-    after = f150.blocks_by_slot(out)
-    for s in range(12):
-        if old.index(s) == new.index(s):
-            assert after[s]["engine"] == before[s]["engine"], s
-    rvb = after[10]
-    assert rvb["pos"] == 1 and rvb["engine"] == f150.engine_for(1, 10, rvb["type"], rvb["params"])
-
-
-def test_engine_for_none_model():
-    # type 3 is the "None" effect in the slots whose spec has no real type 3 (the
-    # ring's per-slot None entries): engine 0x06 at any position (corpus encoding).
-    for slot in f150.NONE_SLOTS:
-        for pos in range(1, 12):
-            assert f150.engine_for(pos, slot, f150.NONE_TYPE, [0.0] * 15) == 0x06, (slot, pos)
-    assert set(f150.NONE_SLOTS) == {0, 1, 2, 4, 6, 7, 8}
-    # DST/DLY/RVB/VOL have a REAL type 3 (Penesas OD, Dual Echo, Spring, Volume)
-    assert f150.engine_for(4, 3, 3, [0.0] * 15) == 0x07
-    assert f150.engine_for(9, 9, 3, [0.0] * 15) == 0x0B
-    assert f150.engine_for(10, 10, 3, [0.0] * 15) == 0x0C
-
-
-def test_apply_edits_moved_none_blocks_stay_none():
-    # "It's GP-150" (the factory placeholder): NR PRE WAH DST N->S CAB are None
-    # (type 3, engine 0x06). Moving RVB right after AMP shifts all of them; they must
-    # stay None, not pick up the new position's engine (DST type 3 + engine 0x00 is a
-    # real drive). Real blocks that moved are still recomputed.
-    b = _active()
-    before = f150.blocks_by_slot(b)
-    out = f150.apply_edits(b, {"order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11]})
-    after = f150.blocks_by_slot(out)
-    for s in (0, 1, 2, 3, 4, 6):
-        assert before[s]["engine"] == 0x06 and after[s]["pos"] == before[s]["pos"] + 1, s
-        assert (after[s]["type"], after[s]["engine"]) == (before[s]["type"], 0x06), s
-    for s in (7, 8, 9, 10):
-        blk = after[s]
-        assert blk["engine"] == f150.engine_for(blk["pos"], s, blk["type"], blk["params"]), s
-    assert after[11] == before[11]  # VOL did not move
+def test_apply_edits_reorder_changes_only_the_order_table():
+    for path in EVID:
+        b = open(path, "rb").read()
+        new = [5, 10] + [s for s in f150.read_order(b)[1:11] if s != 10] + [11]
+        out = f150.apply_edits(b, {"order": new})
+        diff = [i for i in range(len(b)) if b[i] != out[i]]
+        assert all(0x78 <= i < 0x84 for i in diff), (os.path.basename(path), diff)
+        assert f150.read_order(out) == new
+        assert out[0x84:] == b[0x84:]  # every block record + footer untouched (engines too)
 
 
 def test_apply_edits_model_to_none_and_back():
     b = _active()
     # MOD (slot 8, type 41, on) -> the ring's MOD "None" entry: type 3 + engine 0x06,
-    # and OFF (all 1,573 None blocks in the corpus are disabled) ...
+    # and OFF (all None blocks in the corpus are disabled) ...
     assert f150.blocks_by_slot(b)[8]["enabled"] == 1
     out = f150.apply_edits(b, {"models": {8: f150.model_key(8, 3)}})
     mod = f150.blocks_by_slot(out)[8]
@@ -217,57 +213,33 @@ def test_apply_edits_model_to_none_and_back():
     out = f150.apply_edits(b, {"models": {8: f150.model_key(8, 3)}, "bypass": {8: True}})
     mod = f150.blocks_by_slot(out)[8]
     assert (mod["type"], mod["engine"], mod["enabled"]) == (3, 0x06, 1)
-    # NR is None; picking Gate (type 1) gives the position's real engine
+    # NR is None; picking Gate (type 1) gives NR's engine 0x05
     out = f150.apply_edits(b, {"models": {0: f150.model_key(0, 1)}})
     nr = f150.blocks_by_slot(out)[0]
-    assert (nr["type"], nr["engine"]) == (1, f150.engine_for(nr["pos"], 0, 1, nr["params"])) and nr["engine"] != 0x06
-    # DST None -> DST type 3 (Penesas OD, a real effect): real engine, not None
+    assert (nr["type"], nr["engine"]) == (1, 0x05)
+    # DST None -> DST type 3 (Penesas OD, a real effect): DST's engine, not None
     out = f150.apply_edits(b, {"models": {3: f150.model_key(3, 3)}})
     dst = f150.blocks_by_slot(out)[3]
     assert (dst["type"], dst["engine"]) == (3, 0x07)
-    # a None block that is both moved and re-modelled gets the new model's engine
+    # reorder + re-model in one edit: the record stays home, the engine is the slot's
     out = f150.apply_edits(b, {"order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11], "models": {0: f150.model_key(0, 1)}})
     nr = f150.blocks_by_slot(out)[0]
-    assert nr["pos"] == 2 and nr["engine"] == f150.engine_for(2, 0, 1, nr["params"])
+    assert (nr["pos"], nr["rec"], nr["engine"]) == (2, 1, 0x05)
 
 
 def _new_gen():
     return open(os.path.join(ROOT, "re", "gp150", "evidence", "000-New_GEN.prst"), "rb").read()
 
 
-def test_apply_edits_two_step_drag_restores_engines():
-    # New GEN.: Pure Delay (DLY type 0) at position 9, engine 0x0B. Drag it to
-    # position 1 and back: every moved real block gets its position engine and gets
-    # the original one back; the file round-trips byte for byte.
+def test_apply_edits_drag_and_back_round_trips():
+    # New GEN.: Pure Delay (DLY type 0, engine 0x0B). Drag it to chain position 1 and
+    # back: its record never moves and keeps 0x0B; the file round-trips byte for byte.
     b = _new_gen()
     orig = f150.read_order(b)
-    assert orig == [5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11]
-    dly0 = f150.blocks_by_slot(b)[9]
-    assert (dly0["pos"], dly0["type"], dly0["engine"]) == (9, 0, 0x0B)
     s1 = f150.apply_edits(b, {"order": [5, 9, 0, 1, 2, 3, 4, 6, 7, 8, 10, 11]})
     d1 = f150.blocks_by_slot(s1)[9]
-    assert (d1["pos"], d1["type"], d1["engine"]) == (1, 0, 0x05)
-    s2 = f150.apply_edits(s1, {"order": orig})
-    d2 = f150.blocks_by_slot(s2)[9]
-    assert (d2["pos"], d2["type"], d2["engine"]) == (9, 0, 0x0B)
-    assert s2 == b
-    # WAH is None (type 3, engine 0x06): moved twice, it stays None
-    w1 = f150.apply_edits(b, {"order": [5, 2, 0, 1, 3, 4, 6, 7, 8, 9, 10, 11]})
-    assert (f150.blocks_by_slot(w1)[2]["pos"], f150.blocks_by_slot(w1)[2]["engine"]) == (1, 0x06)
-    w2 = f150.apply_edits(w1, {"order": orig})
-    wah = f150.blocks_by_slot(w2)[2]
-    assert (wah["pos"], wah["type"], wah["engine"]) == (3, 3, 0x06)
-    assert w2 == b
-
-
-def test_moved_none_skip_needs_type_3():
-    # engine 0x06 alone is not "None": a moved block of another type is recomputed
-    b = bytearray(_new_gen())
-    pos = f150.read_order(b).index(9)  # DLY (type 0)
-    f150.set_block(b, pos, engine=0x06)
-    out = f150.apply_edits(bytes(b), {"order": [5, 9, 0, 1, 2, 3, 4, 6, 7, 8, 10, 11]})
-    dly = f150.blocks_by_slot(out)[9]
-    assert (dly["pos"], dly["engine"]) == (1, 0x05)
+    assert (d1["pos"], d1["rec"], d1["type"], d1["engine"]) == (1, 9, 0, 0x0B)
+    assert f150.apply_edits(s1, {"order": orig}) == b
 
 
 def test_blank_has_index_and_name():
@@ -337,3 +309,75 @@ def test_engine_table_covers_the_evidence():
                 assert row["engines"][str(type_)] == engine
             checked += 1
     assert checked >= 50
+
+
+# --- ground truth from the pedal (2026-10-04) ------------------------------------------
+DEVICE_OWNED = (0x0E, 0x0F, 0x43C, 0x445)  # device-written field, "saved" flag, enable bits
+
+
+def test_pedal_reordered_preset_decodes_with_fixed_records():
+    b = _pedal_reordered()
+    assert f150.read_order(b) == [5, 0, 1, 2, 3, 4, 10, 6, 7, 8, 9, 11]
+    blocks = f150.blocks_by_slot(b)
+    dly, rvb = blocks[9], blocks[10]
+    # the delay is record 9 whatever the order table says; RVB's move put it at chain position 10
+    assert (dly["rec"], dly["pos"], dly["type"], dly["engine"], dly["enabled"]) == (9, 10, 13, 0x0B, 1)
+    # RVB is None (type 3, engine 0x06, off), moved to chain position 6, record 10
+    assert (rvb["rec"], rvb["pos"], rvb["type"], rvb["engine"], rvb["enabled"]) == (10, 6, 3, 0x06, 0)
+    raw9 = b[0x84 + 9 * 0x44:][:8]
+    assert (raw9[4], raw9[7]) == (13, 0x0B)
+
+
+def test_pedal_reorder_touched_only_the_order_table():
+    a, z = _before_pedal_reorder(), _pedal_reordered()
+    diff = [i for i in range(len(a)) if a[i] != z[i]]
+    assert diff == [0x0E, 0x0F, 0x7E, 0x7F, 0x80, 0x81, 0x82]
+    # reconstructing the pre-reorder file: the pedal's file with the default order table
+    rebuilt = bytearray(z)
+    rebuilt[0x78:0x84] = bytes(f150.DEFAULT_ORDER)
+    assert [i for i in range(len(a)) if a[i] != rebuilt[i]] == [0x0E, 0x0F]
+
+
+def test_order_edit_reproduces_the_pedals_own_reorder():
+    a, z = _before_pedal_reorder(), _pedal_reordered()
+    for base in (a, bytes(z[:0x78]) + bytes(f150.DEFAULT_ORDER) + bytes(z[0x84:])):
+        out = f150.apply_edits(base, {"order": [5, 0, 1, 2, 3, 4, 10, 6, 7, 8, 9, 11]})
+        assert [i for i in range(len(out)) if out[i] != z[i] and i not in DEVICE_OWNED] == []
+
+
+def test_every_evidence_engine_fits_its_slot():
+    # the 8 non-default-order presets included: under the fixed-record mapping every
+    # slot's engine is one its slot carries; 0x06 outside VOL only for None (type 3)
+    reordered = 0
+    for path in EVID:
+        b = open(path, "rb").read()
+        reordered += f150.read_order(b) != f150.DEFAULT_ORDER
+        for s, blk in enumerate(f150.blocks_by_slot(b)):
+            name = f150.SLOTS[s]
+            if blk["engine"] == 0x06 and name != "VOL":
+                assert blk["type"] == f150.NONE_TYPE and blk["enabled"] == 0, (os.path.basename(path), name)
+            else:
+                assert blk["engine"] in ENGINE_SETS[name], (os.path.basename(path), name, hex(blk["engine"]))
+    assert reordered == 8
+
+
+def test_model_change_on_dly_writes_record_9_whatever_the_order():
+    key = f150.model_key(9, 13)  # Sweet Echo
+    for base in (_new_gen(), _pedal_reordered(), _evidence("024-Funky_Clean.prst")):
+        for order in (None, [5, 9, 10, 0, 1, 2, 3, 4, 6, 7, 8, 11]):
+            edits = {"models": {9: key}}
+            if order:
+                edits["order"] = order
+            out = f150.apply_edits(base, edits)
+            rec9 = out[0x84 + 9 * 0x44:][:8]
+            assert (rec9[4], rec9[7]) == (13, 0x0B)
+            assert out[0x84:0x84 + 9 * 0x44] == base[0x84:0x84 + 9 * 0x44]  # other records untouched
+            assert out[0x84 + 10 * 0x44:] == base[0x84 + 10 * 0x44:]
+
+
+def test_none_pick_is_type_3_engine_6_off():
+    for slot in f150.NONE_SLOTS:
+        for base in (_active(), _new_gen(), _pedal_reordered()):
+            out = f150.apply_edits(base, {"models": {slot: f150.model_key(slot, 3)}})
+            blk = f150.blocks_by_slot(out)[slot]
+            assert (blk["type"], blk["engine"], blk["enabled"]) == (3, 0x06, 0), slot

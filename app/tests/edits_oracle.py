@@ -58,10 +58,10 @@ EDIT_SETS = [
 ]
 
 
-# GP-150: one combined edit, keys are slot indexes (Explorer block index == slot):
-# AMP param 0, RVB off, DLY model -> type 4, rename, VOL/BPM, RVB moved right after AMP.
+# GP-150: keys are slot indexes (Explorer block index == slot); every edit addresses
+# the slot's home record, a reorder rewrites only the order table.
 GP150_EDIT_SETS = [
-    {
+    {  # AMP param 0, RVB off, DLY model -> type 4, rename, VOL/BPM, RVB moved right after AMP
         "label": "gp150-combined",
         "edits": {
             "params": {"5": {"0": 33.0}},
@@ -71,6 +71,14 @@ GP150_EDIT_SETS = [
             "settings": {"patch_vol": 60, "bpm": 100},
             "order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11],
         },
+    },
+    {  # DLY -> Sweet Echo (record 9, engine 0x0B) with DLY + RVB dragged right after AMP
+        "label": "gp150-dly-reordered",
+        "edits": {"models": {"9": f150.model_key(9, 13)}, "order": [5, 9, 10, 0, 1, 2, 3, 4, 6, 7, 8, 11]},
+    },
+    {  # None picks (type 3, engine 0x06, off) + a real type 3 (DST Penesas) + NR Gate
+        "label": "gp150-models",
+        "edits": {"models": {"8": f150.model_key(8, 3), "3": f150.model_key(3, 3), "0": f150.model_key(0, 1)}},
     },
 ]
 

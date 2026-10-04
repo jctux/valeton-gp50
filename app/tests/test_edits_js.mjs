@@ -51,7 +51,8 @@ for (const rec of corpus) {
 // GP-150: the evidence presets (re/gp150/evidence/*.prst, 8 of them with a
 // non-default chain order), edited by prst150_format.apply_edits
 const gp150 = corpus.filter((r) => r.srcKey === "gp150");
-check("gp150 records present (11 evidence presets)", gp150.length === 11, `got ${gp150.length}`);
+const gp150Files = new Set(gp150.map((r) => r.path)).size;
+check("gp150 records present (11 evidence presets x 3 edit sets)", gp150Files === 11 && gp150.length === 33, `got ${gp150Files} files, ${gp150.length} records`);
 
 console.log(`\nvectors: ${corpus.length} (gp150: ${gp150.length})`);
 console.log(`checks: ${pass + fail}   pass: ${pass}   fail: ${fail}`);

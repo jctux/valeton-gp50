@@ -35,7 +35,7 @@ let pass = 0, fail = 0; const fails = [];
 const check = (l, ok, d) => { if (ok) pass++; else { fail++; fails.push(`${l}${d ? " — " + d : ""}`); } };
 const hex = (u) => Buffer.from(u).toString("hex");
 const evidence = (name) => new Uint8Array(readFileSync(resolve(root, "re/gp150/evidence", name)));
-const EVID = ["000-New_GEN.prst", "099-Finger_AC.prst", "100-active.prst"];
+const EVID = ["000-New_GEN.prst", "024-Funky_Clean.prst", "099-Finger_AC.prst", "100-active.prst", "199-reordered-by-pedal.prst"];
 const C150 = PRST.codecFor("gp150");
 const ring = JSON.parse(readFileSync(resolve(root, "patch/fxid_ring_gp150.json"), "utf8"));
 const lib = PatchLib.make(ring, {}, PRST.GP150);
@@ -114,7 +114,7 @@ for (const name of EVID) {
   const dly = C150.blocksBySlot(out)[9];
   check("picker: DLY type byte = fxid & 0xff", dly.type === (dlyModel.fxid & 0xff) && dly.subtype === 0 && dly.ext === 0);
   check("picker: DLY params = the ring defaults", dlyModel.params.every((pd) => Math.abs(dly.params[pd.algId] - resolveDefault(pd)) < 1e-6));
-  check("picker: DLY engine from its position", dly.engine === C150.engineFor(dly.pos, 9, dly.type, dly.params));
+  check("picker: DLY engine = DLY's engine for the type (0x0B), at record 9", dly.engine === C150.slotEngine(9, dly.type) && dly.engine === 0x0b && dly.rec === 9);
   const none = C150.blocksBySlot(X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "mod-none")[1]))[8];
   check("picker: MOD None -> type 3 + engine 0x06 (corpus None), and off", none.type === 3 && none.engine === 0x06 && none.enabled === 0 && C150.blocksBySlot(base)[8].enabled === 1);
   const noneOn = C150.blocksBySlot(X.buildEditedBytes(base, "gp150", explorerSpec({ models: { 8: modNone.fxid }, bypass: { 8: true } })))[8];
@@ -125,9 +125,31 @@ for (const name of EVID) {
   check("picker: MOD None decodes as None", inv.patches[0].blocks[8].model === "None");
   let maxAlg = 0; for (const e of Object.values(ring)) for (const pd of e.params || []) maxAlg = Math.max(maxAlg, pd.algId);
   check("ring: every algId fits the 15 floats of a block", maxAlg < C150.N_PARAMS, String(maxAlg));
-  const moved = C150.blocksBySlot(X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "rvb-after-amp")[1]));
-  check("drag RVB after AMP: RVB at position 1", moved[10].pos === 1 && C150.readOrder(X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "rvb-after-amp")[1]))[1] === 10);
-  check("drag RVB after AMP: None blocks stay None", [0, 1, 2, 3, 4, 6].every((s) => moved[s].engine === 0x06));
+  const movedBytes = X.buildEditedBytes(base, "gp150", SPECS.find(([l]) => l === "rvb-after-amp")[1]);
+  const moved = C150.blocksBySlot(movedBytes);
+  check("drag RVB after AMP: RVB at position 1", moved[10].pos === 1 && C150.readOrder(movedBytes)[1] === 10);
+  check("drag RVB after AMP: no block record changes (None blocks stay None)", hex(movedBytes.subarray(0x84)) === hex(base.subarray(0x84)) && [0, 1, 2, 3, 4, 6].every((s) => moved[s].engine === 0x06));
+}
+
+// --- 2b. the hardware case (2026-10-04): RVB dragged right after AMP on slot 199 ------------
+// The step-3 preset (DLY = Sweet Echo, on, engine 0x0B at record 9). The old codec moved
+// the records, so the pedal read the delay record as the reverb slot: no sound (0x0C) or
+// an inert delay (0x0B). Now only the order table changes; the delay record stays put.
+{
+  const step3 = evidence("199-before-pedal-reorder.prst");
+  const order = X.pinChainEnds([5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11], C150.layout);
+  const out = X.buildEditedBytes(step3, "gp150", explorerSpec({ order }));
+  const diff = []; for (let i = 0; i < out.length; i++) if (out[i] !== step3[i]) diff.push(i);
+  check("RVB after AMP on the step-3 preset: only the order table changes", diff.length > 0 && diff.every((i) => i >= 0x78 && i < 0x84), diff.map((i) => i.toString(16)).join());
+  const rec9 = out.subarray(0x84 + 9 * 0x44, 0x84 + 10 * 0x44);
+  check("... the delay record (record 9) is untouched: Sweet Echo, engine 0x0B, on", hex(rec9) === hex(step3.subarray(0x84 + 9 * 0x44, 0x84 + 10 * 0x44)) && rec9[4] === 13 && rec9[7] === 0x0b && rec9[0] === 1);
+  const dly = C150.blocksBySlot(out)[9], rvb = C150.blocksBySlot(out)[10];
+  check("... DLY now at chain position 10, RVB at 1", dly.pos === 10 && rvb.pos === 1 && rvb.rec === 10);
+  // the pedal's own reorder, replayed through the Explorer path, gives the pedal's file
+  const pedal = evidence("199-reordered-by-pedal.prst");
+  const replay = X.buildEditedBytes(step3, "gp150", explorerSpec({ order: C150.readOrder(pedal) }));
+  const off = []; for (let i = 0; i < replay.length; i++) if (replay[i] !== pedal[i] && ![0x0e, 0x0f, 0x43c, 0x445].includes(i)) off.push(i);
+  check("the pedal's reorder replayed via buildEditedBytes == the pedal's file (outside device bytes)", off.length === 0, off.map((i) => i.toString(16)).join());
 }
 
 // --- 3. transport-family guard + GP-5/GP-50 unchanged -------------------------------------
