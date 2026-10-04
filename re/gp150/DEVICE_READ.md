@@ -94,9 +94,15 @@ It stops after 3 failed slots in a row (pedal gone) and still writes the summary
 `device_scan_gp150/` is gitignored. Copy the files you want to keep as fixtures into
 `re/gp150/evidence/` yourself.
 
-`watch` names every changed byte inside the block area by chain position and slot, e.g.
-`pos <p> (<slot>) block byte +0x04 (type <old> -> <new>)`. Block layout: `+0x00` enabled, `+0x04` type,
+`watch` names every changed byte inside the block area by record, slot and chain position, e.g.
+`record <r> (<slot>, chain pos <p>) byte +0x04 (type <old> -> <new>)`. Block records sit at fixed
+indexes (record 0 AMP, 1 NR, 2 PRE, 3 WAH, 4 DST, 5 N→S, 6 CAB … 11 VOL) whatever the chain order;
+the order table at `0x78` lists slots by chain position. Record layout: `+0x00` enabled, `+0x04` type,
 `+0x05` subtype, `+0x06` ext, `+0x07` engine, `+0x08…` 15 × float32 params.
+
+The engine byte per (slot, type) comes from `patch/gp150_engines.json`, learned from a scan by
+`python3 scripts/gp150_engines.py` (`--check` compares). No preset read so far has a real wah, so
+the editor refuses a WAH model pick: set one on the pedal, save, rescan, and rerun the script.
 
 ### Type codes
 
