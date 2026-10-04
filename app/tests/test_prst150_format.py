@@ -3,6 +3,7 @@ presets read live from a GP-150 (re/gp150/evidence/) and, when GP180_DUMP_DIR
 points at a checkout of majabojarska/Valeton-GP180-Rev-Eng/prst-dump, its 200
 factory presets (same container; only header 0x0D-0x0F and footer differ)."""
 import glob
+import json
 import os
 import struct
 
@@ -273,3 +274,66 @@ def test_blank_has_index_and_name():
     b = f150.blank(199)
     assert f150.detect(b) and f150.read_index(b) == 199 and f150.read_name(b) == "New GEN."
     assert f150.read_order(b)[0] == f150.AMP_SLOT
+
+
+# --- block records at fixed home indexes; engines per (slot, type) (hardware 2026-10-04) ---
+# Every engine a slot's record carries in the corpus (the user's 200-slot scan + evidence),
+# read at the slot's HOME record. 0x06 outside VOL is the "None" effect (type 3).
+ENGINE_SETS = {"NR": {0x05}, "PRE": {0x03, 0x00}, "WAH": set(), "DST": {0x07, 0x08}, "N->S": {0x00},
+               "AMP": {0x00, 0x01, 0x03}, "CAB": {0x1A, 0x0A}, "EQ": {0x01}, "MOD": {0x04, 0x01},
+               "DLY": {0x0B}, "RVB": {0x0C}, "VOL": {0x06}}
+
+
+def _engine_table():
+    return json.load(open(os.path.join(ROOT, "patch", "gp150_engines.json")))
+
+
+def test_home_record_index_per_slot():
+    # record r holds slot DEFAULT_ORDER[r]; slot s lives at record DEFAULT_POS[s]
+    assert f150.DEFAULT_ORDER == [5, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11]
+    assert f150.DEFAULT_POS == [1, 2, 3, 4, 5, 0, 6, 7, 8, 9, 10, 11]
+    assert all(f150.DEFAULT_ORDER[f150.DEFAULT_POS[s]] == s for s in range(12))
+
+
+def test_engine_table_shape_and_per_slot_sets():
+    t = _engine_table()
+    assert [row["slot"] for row in t["slots"]] == f150.SLOTS and t["none_engine"] == 0x06
+    for row in t["slots"]:
+        allowed = ENGINE_SETS[row["slot"]]
+        assert set(row["engines"].values()) <= allowed, row["slot"]
+        assert row["default"] in allowed if allowed else row["default"] is None, row["slot"]
+        for type_, counts in row["counts"].items():
+            assert row["engines"][type_] in [int(e) for e in counts], (row["slot"], type_)
+    wah = t["slots"][2]
+    assert wah["default"] is None and wah["engines"] == {}  # no preset holds a real wah
+    eng = {(row["slot"], int(k)): v for row in t["slots"] for k, v in row["engines"].items()}
+    assert eng[("DLY", 13)] == 0x0B and eng[("DLY", 3)] == 0x0B  # Sweet Echo; Dual Echo (real type 3)
+    assert eng[("RVB", 3)] == 0x0C and eng[("DST", 3)] == 0x07  # Spring; Penesas
+    assert eng[("MOD", 41)] == 0x01 and eng[("MOD", 2)] == 0x04
+    assert eng[("CAB", 60)] == 0x0A and eng[("CAB", 80)] == 0x1A
+    assert eng[("DST", 122)] == 0x08 and eng[("DST", 4)] == 0x07
+    assert eng[("PRE", 26)] == 0x00 and eng[("PRE", 0)] == 0x03
+    assert eng[("AMP", 1)] == 0x00 and eng[("AMP", 33)] == 0x01 and eng[("AMP", 9)] == 0x03
+    assert eng[("VOL", 3)] == 0x06 and eng[("N->S", 33)] == 0x00
+    assert ("NR", 3) not in eng and ("MOD", 3) not in eng  # None is not a real engine
+
+
+def test_engine_table_covers_the_evidence():
+    # every real block of the in-repo evidence is in the table's counts, and carries the
+    # table's engine unless its (slot, type) is ambiguous in the corpus
+    t = _engine_table()
+    checked = 0
+    for path in EVID:
+        b = open(path, "rb").read()
+        for s, row in enumerate(t["slots"]):
+            o = f150.BLOCKS_OFF + f150.DEFAULT_POS[s] * f150.BLOCK_LEN
+            type_, engine = b[o + 4], b[o + 7]
+            if engine == 0x06 and s != f150.VOL_SLOT:
+                assert type_ == 3, (path, s)  # None
+                continue
+            counts = row["counts"][str(type_)]
+            assert str(engine) in counts, (os.path.basename(path), row["slot"], type_, engine)
+            if len(counts) == 1:
+                assert row["engines"][str(type_)] == engine
+            checked += 1
+    assert checked >= 50

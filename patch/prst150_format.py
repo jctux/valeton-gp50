@@ -40,6 +40,10 @@ SLOTS = ["NR", "PRE", "WAH", "DST", "N->S", "AMP", "CAB", "EQ", "MOD", "DLY", "R
 AMP_SLOT = 5
 VOL_SLOT = 11  # pinned last: position 11's engine is 0x06, the "None" engine (see write_order)
 MOVABLE = [s for s in SLOTS if s not in ("AMP", "VOL")]
+# The order table of an unreordered preset. Record r always holds slot DEFAULT_ORDER[r]:
+# a slot's record sits at its HOME index DEFAULT_POS[slot], whatever the order table says.
+DEFAULT_ORDER = [AMP_SLOT, 0, 1, 2, 3, 4, 6, 7, 8, 9, 10, VOL_SLOT]
+DEFAULT_POS = [DEFAULT_ORDER.index(s) for s in range(len(SLOTS))]
 
 # spec §6: canonical engine per chain POSITION (position 0 = AMP is computed)
 CANONICAL_ENGINE = [None, 0x05, 0x03, 0x07, 0x07, 0x00, 0x1A, 0x01, 0x04, 0x0B, 0x0C, 0x06]
