@@ -66,6 +66,7 @@ IGNORE = (0x0A, 0x0D, 0x0E, 0x0F)  # import marker (0x5C vs 0x58) + device-writt
 SOURCE_SLOT = 0  # the preset copied for the write test (a factory preset)
 TEST_NAME = "WRITE TEST"
 BLANK_NAME = "New GEN."
+MIN_TWINS = 10  # placeholder mode: how many OTHER scanned slots must hold the same bytes (except 0x04)
 STEPS = [  # index == step number
     "scan precondition",
     "hello + read active",
@@ -75,6 +76,16 @@ STEPS = [  # index == step number
     "import blank, read back",
     "active preset unchanged",
 ]
+PLACEHOLDER_STEPS = [  # --placeholder: the target holds a factory placeholder (no empty slot on the pedal)
+    "scan precondition (placeholder)",
+    STEPS[1],
+    "target slot holds the scanned placeholder",
+    STEPS[3],
+    STEPS[4],
+    "restore the original",
+    STEPS[6],
+]
+
 SHOW = 24  # differing offsets listed before "… (+n more)"
 READ_CMD = "./.venv-midi/bin/python patch/ht_scan.py read {slot}"
 # Step 2 (proving the slot empty). A single read(slot) -> None is not proof: a stream
@@ -126,13 +137,8 @@ def display_number(slot: int) -> int:
     return slot + 1
 
 
-def scan_precondition(slot: int, path: Optional[str] = None) -> str:
-    """Step 0, before any port is opened: the full backup scan (`ht_scan.py scan`)
-    must have completed and recorded `slot` as "empty-acked". Same schema as
-    ht_scan.scan(): {"slots": {"<slot>": {"status": "preset" | "empty-acked" |
-    "empty-unacked" | "error", ...}, ...}, "aborted": "<why>" when it gave up}.
-    Raises Fail (naming the scan command); returns the PASS detail."""
-    path = SCAN_SUMMARY if path is None else path
+def _load_scan(path: str):
+    """The completed scan summary (all slots, not aborted) or Fail naming the scan command."""
     redo = f"run the full backup scan first: {SCAN_CMD}"
     try:
         with open(path) as fh:
@@ -150,6 +156,65 @@ def scan_precondition(slot: int, path: Optional[str] = None) -> str:
     if missing:
         raise Fail(f"the scan in {path} covers {ht_scan.N_SLOTS - len(missing)} of {ht_scan.N_SLOTS} slots "
                    f"(missing e.g. {missing[:5]}) — {redo}")
+    return slots, summary
+
+
+def _scanned_bytes(path: str, entry: Dict) -> bytes:
+    fn = entry.get("file") if isinstance(entry, dict) else None
+    if not fn:
+        raise Fail("the scan entry names no .prst file")
+    with open(os.path.join(os.path.dirname(path), fn), "rb") as fh:
+        return fh.read()
+
+
+def placeholder_precondition(slot: int, path: Optional[str] = None) -> Tuple[str, bytes]:
+    """Step 0 of --placeholder mode: the completed scan must record `slot` as a preset
+    whose scanned bytes (ignoring the index byte 0x04) equal those of at least MIN_TWINS
+    OTHER scanned slots — a factory placeholder, never a user preset. Returns the PASS
+    detail and the scanned bytes (the original to restore in step 5)."""
+    path = SCAN_SUMMARY if path is None else path
+    slots, _summary = _load_scan(path)
+    entry = slots[str(slot)]
+    status = entry.get("status") if isinstance(entry, dict) else None
+    if status != "preset":
+        raise Fail(f"the scan in {path} recorded slot {slot} as {status!r}, not a preset — placeholder mode "
+                   "needs a slot that holds a factory placeholder (run without --placeholder for an empty slot)")
+    try:
+        original = _scanned_bytes(path, entry)
+    except (OSError, Fail) as e:
+        raise Fail(f"cannot read slot {slot}'s scanned preset ({e}) — run the full backup scan first: {SCAN_CMD}")
+    if not f150.detect(original) or f150.read_index(original) != slot:
+        raise Fail(f"slot {slot}'s scanned file is not a GP-150 preset with index {slot}")
+
+    def body(b: bytes) -> bytes:
+        return b[:f150.IDX_OFF] + b"\x00" + b[f150.IDX_OFF + 1:]
+
+    ref = body(original)
+    twins = []
+    for k, e in slots.items():
+        if int(k) == slot or not (isinstance(e, dict) and e.get("status") == "preset" and e.get("file")):
+            continue
+        try:
+            if body(_scanned_bytes(path, e)) == ref:
+                twins.append(int(k))
+        except (OSError, Fail):
+            continue
+    if len(twins) < MIN_TWINS:
+        raise Fail(f"slot {slot} ({f150.read_name(original)!r}) is not a factory placeholder: only {len(twins)} other "
+                   f"scanned slot(s) hold the same bytes (need {MIN_TWINS}); refusing to overwrite a possibly unique preset")
+    when = time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(path)))
+    return (f"{path} ({when}): slot {slot} holds the factory placeholder {f150.read_name(original)!r}, byte-identical "
+            f"(except 0x04) to {len(twins)} other slots e.g. {twins[:5]}; the original is restored in step 5", original)
+
+
+def scan_precondition(slot: int, path: Optional[str] = None) -> str:
+    """Step 0, before any port is opened: the full backup scan (`ht_scan.py scan`)
+    must have completed and recorded `slot` as "empty-acked". Same schema as
+    ht_scan.scan(): {"slots": {"<slot>": {"status": "preset" | "empty-acked" |
+    "empty-unacked" | "error", ...}, ...}, "aborted": "<why>" when it gave up}.
+    Raises Fail (naming the scan command); returns the PASS detail."""
+    path = SCAN_SUMMARY if path is None else path
+    slots, _summary = _load_scan(path)
     entry = slots[str(slot)]
     status = entry.get("status") if isinstance(entry, dict) else None
     if status != "empty-acked":
@@ -171,7 +236,7 @@ def _without_read_back_hint(msg: str, slot: int) -> str:
     return msg[:-len(tail)] if msg.endswith(tail) else msg
 
 
-def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Result]:
+def run(slot: int, session=None, log: Callable[[str], None] = print, placeholder: bool = False) -> List[Result]:
     """The protocol: step 0 (the scan summary; no port), then steps 1..6 on ONE
     session (`session`, or a new ht_scan.Session() on the GP-150 ports when None —
     opened only after step 0 passed, closed again at the end). Logs one line per
@@ -182,9 +247,11 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
     results: List[Result] = []
     state: Dict[str, bytes] = {}
 
+    labels = PLACEHOLDER_STEPS if placeholder else STEPS
+
     def record(passed: bool, detail: str) -> None:
         n = len(results)  # step 0 first
-        label = STEPS[n]
+        label = labels[n]
         results.append((label, passed, detail))
         log(f"{n} {'PASS' if passed else 'FAIL'} {label} — {detail}")
 
@@ -202,7 +269,11 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
         f"source slot {SOURCE_SLOT}, WRITE_VERIFIED['gp150'] = {dw.WRITE_VERIFIED.get('gp150')} "
         "(this run passes allow_unverified)")
     try:
-        detail, passed = scan_precondition(slot), True
+        if placeholder:
+            detail, state["original"] = placeholder_precondition(slot)
+        else:
+            detail = scan_precondition(slot)
+        passed = True
     except Fail as e:
         detail, passed = str(e), False
     except Exception as e:  # noqa: BLE001 — a malformed summary: FAIL, never a traceback
@@ -306,6 +377,18 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
             raise Fail(f"read {n}: unexpected read status {status!r}; nothing was written")
         return status
 
+    def step2_placeholder() -> str:
+        cur = s.read(slot)
+        if cur is None:
+            raise Fail(f"slot {slot} reads EMPTY now (last_status={s.last_status}) but the scan recorded the placeholder — "
+                       "re-scan; nothing was written")
+        original = state["original"]
+        if not same_except(cur, original, ignore=IGNORE + (f150.IDX_OFF,)):
+            offs = [i for i in diff_offsets(cur, original) if i not in IGNORE + (f150.IDX_OFF,)]
+            raise Fail(f"slot {slot} now holds {_preset(cur)} which differs from the scanned placeholder at "
+                       f"{len(offs)} offset(s) {_offsets(offs)} — re-scan; nothing was written")
+        return f"slot {slot} still holds the scanned placeholder {_preset(cur)}"
+
     def step2() -> str:
         statuses = [empty_read(1), empty_read(2)]
         return (f"slot {slot} read empty twice (last_status={', '.join(statuses)}: "
@@ -345,6 +428,18 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
                        f"{_offsets(real)}; {b0a}; {ignored}")
         return f"read back {_preset(back)} == sent; {b0a} (the import sent {ht.IMPORT_BYTE_0A:#04x}); {ignored}"
 
+    def step5_placeholder() -> str:
+        original = state["original"]
+        res = write(original)
+        back = s.read(slot)
+        if back is None:
+            raise Fail(f"slot {slot} reads back EMPTY (last_status={s.last_status}) after restoring the original")
+        if not same_except(back, original):
+            offs = [i for i in diff_offsets(back, original) if i not in IGNORE]
+            raise Fail(f"restored slot {slot} reads back {_preset(back)} differing from the original at "
+                       f"{len(offs)} offset(s) {_offsets(offs)}")
+        return f"original {_preset(original)} written back: {sent_note(res)}; read back == original"
+
     def step5() -> str:
         blank = f150.blank(slot)
         res = write(blank)
@@ -370,7 +465,9 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
         return f"identical to step 1's read ({_preset(now)})"
 
     try:
-        for n, step in enumerate((step1, step2, step3, step4, step5, step6), 1):
+        steps = (step1, step2_placeholder if placeholder else step2, step3, step4,
+                 step5_placeholder if placeholder else step5, step6)
+        for n, step in enumerate(steps, 1):
             try:
                 detail, passed = step(), True
             except Fail as e:
@@ -386,10 +483,11 @@ def run(slot: int, session=None, log: Callable[[str], None] = print) -> List[Res
     finally:
         if own:
             s.close()
-    log(f"all {len(STEPS)} steps PASS — copy this whole output into re/gp150/DEVICE_WRITE.md")
+    log(f"all {len(labels)} steps PASS — copy this whole output into re/gp150/DEVICE_WRITE.md")
+    final_name = f150.read_name(state["original"]) if placeholder else BLANK_NAME
     log("manual check (record the answer in re/gp150/DEVICE_WRITE.md):")
     log(f"  a. select preset {display_number(slot):03d} on the pedal's display (internal slot {slot}; Suite "
-        f"numbers presets from 001) and confirm the screen shows {BLANK_NAME!r}; play a few notes: does it sound?")
+        f"numbers presets from 001) and confirm the screen shows {final_name!r}; play a few notes: does it sound?")
     log("  note: §8.2 (does the pedal refresh the active preset on rewrite?) will be a scripted, tested mode "
         "added in Task 13 — do not improvise it.")
     return results
@@ -400,19 +498,22 @@ def main(argv: Optional[List[str]] = None) -> int:
         prog="ht_write_verify.py",
         description="GP-150 supervised write verification (writes ONLY to an empty slot; stops at the first FAIL).")
     ap.add_argument("slot", type=int, help=f"an EMPTY slot 1..{ht_scan.N_SLOTS - 1} (use 199)")
+    ap.add_argument("--placeholder", action="store_true",
+                    help="the slot holds a factory placeholder (same bytes as many other slots in the scan); "
+                         "it is restored from the scan at the end. For pedals with no empty slot.")
     args = ap.parse_args(argv)
     try:
         _check_slot(args.slot)
     except ValueError as e:
         ap.error(str(e))
     try:
-        results = run(args.slot)
+        results = run(args.slot, placeholder=args.placeholder)
     except KeyboardInterrupt:
         print(f"interrupted — if a write had started, read slot {args.slot} back before retrying: "
               f"{READ_CMD.format(slot=args.slot)}; power-cycle the pedal if hello gets no answer; "
               "do not flip the gate")
         return 130
-    return 0 if len(results) == len(STEPS) and all(ok for _label, ok, _detail in results) else 1
+    return 0 if len(results) == len(STEPS) and all(ok for _label, ok, _detail in results) else 1  # both modes have 7 steps
 
 
 if __name__ == "__main__":

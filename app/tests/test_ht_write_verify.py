@@ -228,13 +228,13 @@ def _second_session(*a, **k):
     pytest.fail("ht_write_verify constructed a second Session (it must reuse the one it was handed)")
 
 
-def run_on(pedal, monkeypatch, slot=SLOT, **opts):
+def run_on(pedal, monkeypatch, slot=SLOT, placeholder=False, **opts):
     o = dict(OPTS)
     o.update(opts)
     s = ht_scan.Session(pedal.inp, pedal.out, to_message=FakeMsg, **o)
     monkeypatch.setattr(ht_scan, "Session", _second_session)  # R-ONE-SESSION
     lines = []
-    results = hwv.run(slot, session=s, log=lines.append)
+    results = hwv.run(slot, session=s, log=lines.append, placeholder=placeholder)
     return results, lines, s
 
 
@@ -655,3 +655,76 @@ def test_the_cli_exits_nonzero_on_a_fail_and_on_a_missing_port(monkeypatch, midi
     assert oks(results) == [True, False] and "no MIDI port" in results[1][2]
     assert hwv.main([str(SLOT)]) == 1
     assert midi_port_guard == []
+
+
+# --- placeholder mode: a pedal with no empty slot (seen 2026-10-04: slots 111..199 hold
+# 89 byte-identical factory "It's GP-150" presets) --------------------------------------
+PH_NAME = "It's GP-150"
+
+
+def placeholder_bytes(slot):
+    b = bytearray(f150.blank(slot))
+    f150.write_name(b, PH_NAME)
+    return bytes(b)
+
+
+@pytest.fixture
+def placeholder_scan(scan_summary, summary_template):
+    """A completed scan where SLOT and 20 twins hold the same factory placeholder, with
+    the scanned .prst files on disk next to the summary (as ht_scan.scan() leaves them)."""
+    summary = full_summary(summary_template)
+    d = os.path.dirname(hwv.SCAN_SUMMARY)
+    for i in range(SLOT - 20, SLOT + 1):
+        fn = f"{i:03d}-It_s_GP_150.prst"
+        with open(os.path.join(d, fn), "wb") as fh:
+            fh.write(placeholder_bytes(i))
+        summary["slots"][str(i)] = {"status": "preset", "ms": 300, "name": PH_NAME, "index": i, "file": fn}
+
+    def rewrite(mutate=None):
+        if mutate:
+            mutate(summary, d)
+        scan_summary(summary)
+
+    rewrite()
+    return rewrite
+
+
+def test_placeholder_mode_writes_then_restores_the_original(placeholder_scan, monkeypatch, midi_port_guard):
+    ph = placeholder_bytes(SLOT)
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: ph})
+    results, lines, _s = run_on(p, monkeypatch, placeholder=True)
+    assert oks(results) == [True] * 7, "\n".join(lines)
+    assert [label for label, _ok, _d in results] == hwv.PLACEHOLDER_STEPS
+    assert len(p.imports) == 2 and f150.read_name(p.imports[0]) == hwv.TEST_NAME
+    assert f150.read_name(p.presets[SLOT]) == PH_NAME and hwv.same_except(p.presets[SLOT], ph)
+    assert any(PH_NAME in ln for ln in lines if ln.startswith("  a.")), "manual check names the restored preset"
+    assert midi_port_guard == []
+
+
+def test_placeholder_mode_refuses_a_slot_with_too_few_twins(placeholder_scan, monkeypatch, midi_port_guard):
+    def unique(summary, d):  # SLOT's bytes differ from every other scanned preset
+        fn = summary["slots"][str(SLOT)]["file"]
+        with open(os.path.join(d, fn), "wb") as fh:
+            fh.write(flip(placeholder_bytes(SLOT), 0x30, 0x31))
+    placeholder_scan(unique)
+    lines = []
+    results = hwv.run(SLOT, log=lines.append, placeholder=True)  # no session: step 0 must stop it
+    assert oks(results) == [False] and "placeholder" in results[0][2] and midi_port_guard == []
+
+
+def test_placeholder_mode_refuses_when_the_pedal_no_longer_holds_the_scanned_bytes(placeholder_scan, monkeypatch, midi_port_guard):
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST, SLOT: flip(placeholder_bytes(SLOT), 0x30)})
+    results, lines, _s = run_on(p, monkeypatch, placeholder=True)
+    assert oks(results) == [True, True, False], "\n".join(lines)
+    assert p.imports == [] and midi_port_guard == []
+
+
+def test_placeholder_mode_refuses_an_empty_slot(placeholder_scan, monkeypatch, midi_port_guard):
+    p = WritePedal(presets={0: None, ACTIVE: ACTIVE_PRST})  # SLOT reads empty now
+    results, lines, _s = run_on(p, monkeypatch, placeholder=True)
+    assert oks(results) == [True, True, False] and p.imports == []
+
+
+def test_placeholder_mode_is_off_by_default(placeholder_scan, midi_port_guard):
+    results = hwv.run(SLOT, log=lambda _l: None)
+    assert oks(results) == [False] and "not 'empty-acked'" in results[0][2] and midi_port_guard == []
