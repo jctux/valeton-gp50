@@ -1135,6 +1135,7 @@ input[type="range"]::-moz-range-thumb {
 }
 .picker-pick:hover { background: var(--track); border-color: var(--border); }
 .picker-pick.current { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.picker-pick.refused, .picker-pick.refused:hover { opacity: 0.45; cursor: not-allowed; background: none; border-color: transparent; }
 .picker-pick .subtitle { font-size: 0.72rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .picker-type {
   font-size: 0.65rem; padding: 0.05em 0.35em; border-radius: 999px;

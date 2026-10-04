@@ -46,6 +46,21 @@
   // GP-150 codec also turns such a block off): the Explorer shows the block off too.
   const nonePick = (key, blkIdx, fxid) => { const C = codecOf(key); return !!(C.isNoneModel && C.isNoneModel(blkIdx, fxid)); };
 
+  // Why the model picker can't offer `fxid` for block `blkIdx`, or null. GP-150: a model
+  // whose engine byte is ambiguous or unknown in the corpus is refused by the codec
+  // (PRST150.pickAllowed false — a wrong engine silences the preset), unless it re-picks the
+  // model stored in the block, which keeps the stored engine. `stored` = the preset's
+  // decoded block (patchlib: type_code + engine), or null. GP-5/GP-50: never.
+  function pickRefusal(key, blkIdx, fxid, stored) {
+    const C = codecOf(key);
+    if (typeof C.pickAllowed !== "function") return null;
+    const type = Number(fxid) & 0xff;
+    if (C.pickAllowed(blkIdx, type)) return null;
+    if (stored && stored.engine != null && C.keepsStoredEngine(blkIdx, type, stored.type_code, stored.engine)) return null;
+    try { C.slotEngine(blkIdx, type); } catch (e) { return e.message; }
+    return null;
+  }
+
   // The chain strip of a layout with pinned ends (GP-150: AMP first, VOL last): the
   // locked head, the draggable middle (chain order kept) and the locked tail.
   function chainStripParts(order, layout) {
@@ -97,7 +112,7 @@
     return writes.filter((w) => !String(names[w.from] || "").trim());
   }
 
-  const API = { buildEditedBytes, nameMax, bpmMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, chainBlocks, EMPTY_LABEL };
+  const API = { buildEditedBytes, nameMax, bpmMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, pickRefusal, chainStripParts, pinChainEnds, chainBlocks, EMPTY_LABEL };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.ExplorerEdits = API;
 })(typeof self !== "undefined" ? self : this);

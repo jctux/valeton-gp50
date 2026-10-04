@@ -26,23 +26,27 @@
   // spec; the ring's per-slot "None" entries); AMP, DST, DLY, RVB and VOL have a real
   // type 3. VOL's "Volume" also carries 0x06.
   const ENGINE_BYPASS = 0x06, NONE_TYPE = 3, NONE_SLOTS = [0, 1, 2, 4, 6, 7, 8];
-  // Per slot: [engine for a type the corpus never shows (null: none known — WAH),
-  // {type: engine}] — a copy of patch/gp150_engines.json (scripts/gp150_engines.py),
-  // checked equal by app/tests/test_prst150_js.mjs.
+  // Per slot, as learned from the corpus: [the slot's most common engine (null: no real
+  // effect ever seen — WAH), {type: majority engine}, {type: {engine: count}}] — a copy of
+  // patch/gp150_engines.json (scripts/gp150_engines.py), checked equal (counts included) by
+  // app/tests/test_prst150_js.mjs. Model picks go by the counts only (pickAllowed).
   const ENGINES = [
-    [0x05, { 1: 0x05, 7: 0x05, 8: 0x05 }], // NR
-    [0x03, { 0: 0x03, 1: 0x03, 2: 0x03, 6: 0x03, 8: 0x03, 11: 0x03, 16: 0x03, 20: 0x03, 26: 0x00, 34: 0x03, 36: 0x03, 43: 0x03, 68: 0x03, 81: 0x03 }], // PRE
-    [null, {}], // WAH
-    [0x07, { 1: 0x07, 3: 0x07, 4: 0x07, 13: 0x07, 17: 0x07, 20: 0x07, 21: 0x07, 25: 0x07, 27: 0x07, 36: 0x07, 39: 0x07, 43: 0x07, 46: 0x07, 47: 0x07, 53: 0x07, 57: 0x07, 58: 0x07, 59: 0x07, 64: 0x07, 67: 0x07, 72: 0x07, 73: 0x07, 78: 0x07, 89: 0x07, 90: 0x07, 93: 0x07, 95: 0x07, 104: 0x07, 105: 0x07, 110: 0x07, 115: 0x07, 117: 0x07, 118: 0x08, 119: 0x07, 122: 0x08 }], // DST
-    [0x00, { 27: 0x00, 33: 0x00 }], // N->S
-    [0x00, { 0: 0x00, 1: 0x00, 2: 0x01, 7: 0x01, 9: 0x03, 11: 0x00, 15: 0x01, 20: 0x00, 25: 0x01, 26: 0x00, 33: 0x01, 35: 0x01, 73: 0x01 }], // AMP
-    [0x1a, { 0: 0x1a, 16: 0x1a, 32: 0x1a, 48: 0x1a, 60: 0x0a, 64: 0x1a, 80: 0x1a, 96: 0x1a, 112: 0x1a, 128: 0x1a, 144: 0x1a, 160: 0x1a, 176: 0x1a, 192: 0x1a, 208: 0x1a, 224: 0x1a, 240: 0x1a }], // CAB
-    [0x01, { 53: 0x01, 54: 0x01, 57: 0x01, 60: 0x01 }], // EQ
-    [0x04, { 1: 0x04, 2: 0x04, 8: 0x04, 17: 0x04, 18: 0x04, 21: 0x04, 23: 0x04, 25: 0x04, 32: 0x04, 33: 0x04, 41: 0x01, 45: 0x04, 48: 0x04 }], // MOD
-    [0x0b, { 0: 0x0b, 3: 0x0b, 4: 0x0b, 6: 0x0b, 13: 0x0b, 29: 0x0b, 31: 0x0b }], // DLY
-    [0x0c, { 0: 0x0c, 1: 0x0c, 2: 0x0c, 3: 0x0c, 4: 0x0c, 6: 0x0c, 8: 0x0c, 9: 0x0c, 13: 0x0c, 18: 0x0c }], // RVB
-    [0x06, { 3: 0x06 }], // VOL
+    [0x05, { 1: 0x05, 7: 0x05, 8: 0x05 }, { 1: { 5: 6 }, 7: { 5: 4 }, 8: { 5: 1 } }], // NR
+    [0x03, { 0: 0x03, 1: 0x03, 2: 0x03, 6: 0x03, 8: 0x03, 11: 0x03, 16: 0x03, 20: 0x03, 26: 0x00, 34: 0x03, 36: 0x03, 43: 0x03, 68: 0x03, 81: 0x03 }, { 0: { 3: 21 }, 1: { 3: 12 }, 2: { 3: 3 }, 6: { 3: 3 }, 8: { 3: 4 }, 11: { 0: 1, 3: 3 }, 16: { 3: 1 }, 20: { 3: 1 }, 26: { 0: 2 }, 34: { 3: 2 }, 36: { 3: 2 }, 43: { 3: 3 }, 68: { 3: 1 }, 81: { 3: 1 } }], // PRE
+    [null, {}, {}], // WAH
+    [0x07, { 1: 0x07, 3: 0x07, 4: 0x07, 13: 0x07, 17: 0x07, 20: 0x07, 21: 0x07, 25: 0x07, 27: 0x07, 36: 0x07, 39: 0x07, 43: 0x07, 46: 0x07, 47: 0x07, 53: 0x07, 57: 0x07, 58: 0x07, 59: 0x07, 64: 0x07, 67: 0x07, 72: 0x07, 73: 0x07, 78: 0x07, 89: 0x07, 90: 0x07, 93: 0x07, 95: 0x07, 104: 0x07, 105: 0x07, 110: 0x07, 115: 0x07, 117: 0x07, 118: 0x08, 119: 0x07, 122: 0x08 }, { 1: { 7: 2 }, 3: { 7: 1 }, 4: { 7: 14 }, 13: { 7: 3 }, 17: { 7: 1 }, 20: { 7: 3 }, 21: { 7: 1 }, 25: { 7: 1 }, 27: { 7: 1 }, 36: { 7: 2 }, 39: { 7: 6 }, 43: { 7: 1 }, 46: { 7: 4 }, 47: { 7: 2 }, 53: { 7: 14 }, 57: { 7: 1 }, 58: { 7: 2 }, 59: { 7: 4 }, 64: { 7: 4 }, 67: { 7: 1 }, 72: { 7: 2 }, 73: { 7: 1 }, 78: { 7: 3 }, 89: { 7: 2 }, 90: { 7: 8 }, 93: { 7: 1 }, 95: { 7: 1 }, 104: { 7: 1 }, 105: { 7: 5 }, 110: { 7: 3 }, 115: { 7: 3 }, 117: { 7: 1, 8: 1 }, 118: { 8: 2 }, 119: { 7: 1 }, 122: { 8: 7 } }], // DST
+    [0x00, { 27: 0x00, 33: 0x00 }, { 27: { 0: 14 }, 33: { 0: 79 } }], // N->S
+    [0x00, { 0: 0x00, 1: 0x00, 2: 0x01, 7: 0x01, 9: 0x03, 11: 0x00, 15: 0x01, 20: 0x00, 25: 0x01, 26: 0x00, 33: 0x01, 35: 0x01, 73: 0x01 }, { 0: { 0: 6 }, 1: { 0: 18, 1: 2, 3: 4 }, 2: { 1: 1 }, 7: { 1: 1 }, 9: { 3: 1 }, 11: { 0: 1 }, 15: { 1: 2 }, 20: { 0: 1 }, 25: { 1: 1 }, 26: { 0: 13 }, 33: { 1: 2 }, 35: { 1: 3 }, 73: { 1: 1 } }], // AMP
+    [0x1a, { 0: 0x1a, 16: 0x1a, 32: 0x1a, 48: 0x1a, 60: 0x0a, 64: 0x1a, 80: 0x1a, 96: 0x1a, 112: 0x1a, 128: 0x1a, 144: 0x1a, 160: 0x1a, 176: 0x1a, 192: 0x1a, 208: 0x1a, 224: 0x1a, 240: 0x1a }, { 0: { 26: 11 }, 16: { 26: 7 }, 32: { 26: 2 }, 48: { 26: 2 }, 60: { 10: 7 }, 64: { 26: 2 }, 80: { 26: 28 }, 96: { 26: 1 }, 112: { 26: 19 }, 128: { 26: 2 }, 144: { 26: 5 }, 160: { 26: 5 }, 176: { 26: 3 }, 192: { 26: 4 }, 208: { 26: 7 }, 224: { 26: 5 }, 240: { 26: 1 } }], // CAB
+    [0x01, { 53: 0x01, 54: 0x01, 57: 0x01, 60: 0x01 }, { 53: { 1: 12 }, 54: { 1: 10 }, 57: { 1: 7 }, 60: { 1: 1 } }], // EQ
+    [0x04, { 1: 0x04, 2: 0x04, 8: 0x04, 17: 0x04, 18: 0x04, 21: 0x04, 23: 0x04, 25: 0x04, 32: 0x04, 33: 0x04, 41: 0x01, 45: 0x04, 48: 0x04 }, { 1: { 4: 2 }, 2: { 4: 7 }, 8: { 4: 1 }, 17: { 4: 4 }, 18: { 4: 1 }, 21: { 4: 1 }, 23: { 4: 1 }, 25: { 4: 4 }, 32: { 4: 1 }, 33: { 4: 1 }, 41: { 1: 3 }, 45: { 4: 1 }, 48: { 4: 1 } }], // MOD
+    [0x0b, { 0: 0x0b, 3: 0x0b, 4: 0x0b, 6: 0x0b, 13: 0x0b, 29: 0x0b, 31: 0x0b }, { 0: { 11: 30 }, 3: { 11: 3 }, 4: { 11: 1 }, 6: { 11: 1 }, 13: { 11: 3 }, 29: { 11: 4 }, 31: { 11: 2 } }], // DLY
+    [0x0c, { 0: 0x0c, 1: 0x0c, 2: 0x0c, 3: 0x0c, 4: 0x0c, 6: 0x0c, 8: 0x0c, 9: 0x0c, 13: 0x0c, 18: 0x0c }, { 0: { 12: 4 }, 1: { 12: 52 }, 2: { 12: 4 }, 3: { 12: 23 }, 4: { 12: 13 }, 6: { 12: 2 }, 8: { 12: 2 }, 9: { 12: 1 }, 13: { 12: 1 }, 18: { 12: 3 } }], // RVB
+    [0x06, { 3: 0x06 }, { 3: { 6: 203 } }], // VOL
   ];
+  // N->S holds SnapTone captures of different kinds (the ring's NAM, DST, CAB IR and Bass
+  // AMP entries); the corpus shows only its NAM types, so it is never a single-engine slot.
+  const MIXED_SLOTS = [4];
   const layout = {
     BLOCK_NAMES: SLOTS.slice(), MOVABLE_BLOCKS: new Set(SLOTS.filter((s) => s !== "AMP" && s !== "VOL")),
     PARAMS_PER_BLOCK: N_PARAMS, N_BLOCKS, AMP_INDEX: AMP_SLOT, VOL_INDEX: VOL_SLOT, NS_INDEX: 4, CAB_INDEX: 6,
@@ -82,17 +86,40 @@
     if (order[N_BLOCKS - 1] !== VOL_SLOT) throw new Error("chain position 11 must be VOL (slot 11)");
     for (let i = 0; i < N_BLOCKS; i++) b[ORDER_OFF + i] = order[i];
   }
-  // Engine byte for effect `type` in `slot` (prst150_format.slot_engine): None -> 0x06;
-  // else the corpus engine of (slot, type), or the slot's default for an unseen type;
-  // refused when the slot's real engine is unknown (WAH) — a wrong engine silences the preset.
-  function slotEngine(slot, type) {
-    slot = Number(slot); type = Number(type);
-    if (!(Number.isInteger(slot) && slot >= 0 && slot < N_BLOCKS)) throw new Error(`block slot out of range: ${slot}`);
+  const checkSlot = (slot) => { slot = Number(slot); if (!(Number.isInteger(slot) && slot >= 0 && slot < N_BLOCKS)) throw new Error(`block slot out of range: ${slot}`); return slot; };
+  // The engine a pick of (slot, type) writes, or null when none is known for sure
+  // (prst150_format._pick_engine): (a) a seen pair only with ONE engine in the counts;
+  // (b) an unseen type only in a slot with one engine for every seen type (not N->S).
+  function pickEngine(slot, type) {
     if (type === NONE_TYPE && NONE_SLOTS.includes(slot)) return ENGINE_BYPASS;
-    const [def, byType] = ENGINES[slot];
-    const e = Object.prototype.hasOwnProperty.call(byType, type) ? byType[type] : def;
-    if (e == null) throw new Error(`no engine byte is known for a ${SLOTS[slot]} effect (type ${type}) on the GP-150: no preset read so far uses one — set it on the pedal, save and rescan`);
+    const counts = ENGINES[slot][2];
+    if (Object.prototype.hasOwnProperty.call(counts, type)) {
+      const seen = Object.keys(counts[type]);
+      return seen.length === 1 ? Number(seen[0]) : null;
+    }
+    const every = new Set(); for (const c of Object.values(counts)) for (const e of Object.keys(c)) every.add(Number(e));
+    return every.size === 1 && !MIXED_SLOTS.includes(slot) ? [...every][0] : null;
+  }
+  // True when a model pick of `type` in `slot` has an unambiguous engine byte
+  // (prst150_format.pick_allowed): the None model, a pair with one engine in the corpus,
+  // or any type in a single-engine slot (NR, EQ, DLY, RVB, VOL). Ambiguous pairs and unseen
+  // types in PRE/WAH/DST/N->S/AMP/CAB/MOD are refused — a wrong engine silences the preset.
+  const pickAllowed = (slot, type) => pickEngine(checkSlot(slot), Number(type)) !== null;
+  // Engine byte for a pick of `type` in `slot` (prst150_format.slot_engine): None -> 0x06;
+  // else the corpus engine when pickAllowed, otherwise an error (nothing is guessed).
+  function slotEngine(slot, type) {
+    slot = checkSlot(slot); type = Number(type);
+    const e = pickEngine(slot, type);
+    if (e === null) throw new Error(`no unambiguous engine byte is known for ${SLOTS[slot]} type ${type}: set it on the pedal, save, rescan, run scripts/gp150_engines.py and copy the table into prst150.js ENGINES`);
     return e;
+  }
+  // A pick of the model already stored in `slot` (same type; the stored block not the None
+  // effect, engine 0x06 outside VOL) keeps the stored engine: never refused, never rewritten
+  // (prst150_format.keeps_stored_engine). A None pick is never a re-pick.
+  function keepsStoredEngine(slot, type, storedType, storedEngine) {
+    slot = checkSlot(slot); type = Number(type);
+    if (type === NONE_TYPE && NONE_SLOTS.includes(slot)) return false;
+    return type === Number(storedType) && (Number(storedEngine) !== ENGINE_BYPASS || slot === VOL_SLOT);
   }
   // the ring's per-slot "None" entry: type 3 in a NONE_SLOTS slot
   const isNoneModel = (slot, key) => NONE_SLOTS.includes(Number(slot)) && (Number(key) & 0xff) === NONE_TYPE;
@@ -106,14 +133,16 @@
   const refixCrc = () => {};
   // Explorer edit spec -> new bytes (prst150_format.apply_edits): keys are SLOTS and
   // address the slot's home record; "order" rewrites only the order table; a model pick
-  // writes the type + the slot's engine for it; a None pick also turns the block off.
+  // writes the type + the slot's engine for it (refused when ambiguous, unless it re-picks
+  // the stored model, which keeps its engine); a None pick also turns the block off.
   function applyEdits(prst, edits) {
     prst = u8(prst); check(prst); edits = edits || {};
     const b = Uint8Array.from(prst);
     if (edits.order != null) writeOrder(b, edits.order);
     for (const [slot, key] of Object.entries(edits.models || {})) {
       const k = Number(key) >>> 0, s = Number(slot), type = k & 0xff;
-      const engine = slotEngine(s, type);
+      const cur = blockOf(b, s);
+      const engine = keepsStoredEngine(s, type, cur.type, cur.engine) ? cur.engine : slotEngine(s, type); // a re-pick keeps the stored engine
       setBlock(b, s, { type, subtype: (k >> 8) & 0xff, ext: (k >> 16) & 0xff, engine });
       if (s === AMP_SLOT && (type === 2 || type === 7)) setBlock(b, s, { ext: 1 });
       if (s === 4 && type === 0) setBlock(b, s, { subtype: 1 }); // empty N->S carries subtype 1 (spec App. A)
@@ -134,7 +163,7 @@
     key: "gp150", layout, MAGIC, PRST_LEN, NAME_OFF, NAME_LEN, ORDER_OFF, BLOCKS_OFF, BLOCK_LEN, N_BLOCKS, N_PARAMS, FOOTER_OFF, SLOTS, AMP_SLOT, VOL_SLOT,
     DEFAULT_ORDER, DEFAULT_POS, ENGINES, ENGINE_BYPASS, NONE_TYPE, NONE_SLOTS, isNoneModel,
     detect, readIndex, writeIndex, readName, writeName, readVolBpm, writeVolBpm, readOrder, writeOrder, isPermutation,
-    blockOf, blocksBySlot, setBlock, setParam, slotEngine, modelKey, modelRecords, modelRecOffset, bypassMask, paramFloats,
+    blockOf, blocksBySlot, setBlock, setParam, slotEngine, pickAllowed, keepsStoredEngine, MIXED_SLOTS, modelKey, modelRecords, modelRecOffset, bypassMask, paramFloats,
     fsOffset, readFootswitches, refixCrc, applyEdits, blankPrst, BLANK_B64,
   };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.PRST150 = API;

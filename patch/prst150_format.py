@@ -66,19 +66,27 @@ NONE_TYPE = 3
 NONE_SLOTS = (0, 1, 2, 4, 6, 7, 8)
 
 
-def _load_engines() -> List[Tuple[Optional[int], Dict[int, int]]]:
-    """patch/gp150_engines.json (scripts/gp150_engines.py) -> per slot (default, {type: engine})."""
+def _load_engines() -> List[Tuple[Optional[int], Dict[int, int], Dict[int, Dict[int, int]]]]:
+    """patch/gp150_engines.json (scripts/gp150_engines.py) -> per slot
+    (default, {type: engine}, {type: {engine: count}})."""
     with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "gp150_engines.json")) as fh:
         t = json.load(fh)
     rows = t["slots"]
     if [r["slot"] for r in rows] != SLOTS:
         raise ValueError("gp150_engines.json: slots do not match SLOTS")
-    return [(r["default"], {int(k): int(v) for k, v in r["engines"].items()}) for r in rows]
+    return [(r["default"], {int(k): int(v) for k, v in r["engines"].items()},
+             {int(k): {int(e): int(n) for e, n in c.items()} for k, c in r["counts"].items()}) for r in rows]
 
 
-# Per slot: (engine for a type the corpus never shows — None when no real effect was
-# ever seen there, i.e. WAH — and {type: engine} learned from the corpus).
+# Per slot, as learned from the corpus: (the slot's most common engine — None when no
+# real effect was ever seen there, i.e. WAH —, {type: majority engine}, {type: {engine:
+# count}}). Model picks go by the counts only (pick_allowed): the majority of an
+# ambiguous (slot, type) is a guess, and a wrong engine silences the preset.
 ENGINES = _load_engines()
+# N->S holds SnapTone captures of different kinds (the ring's NAM, DST, CAB IR and Bass
+# AMP entries) and the corpus shows only its NAM types (27, 33): the one engine seen
+# there says nothing about the others, so N->S is never a single-engine slot.
+MIXED_SLOTS = (4,)
 
 
 def detect(b: bytes) -> bool:
@@ -179,22 +187,55 @@ def write_order(b: bytearray, order: Sequence[int]) -> None:
     b[ORDER_OFF:ORDER_OFF + N_BLOCKS] = bytes(order)
 
 
-def slot_engine(slot: int, type_: int) -> int:
-    """Engine byte for effect `type_` in `slot`: the "None" model is 0x06; else the
-    corpus engine of (slot, type), or the slot's most common engine for a type the
-    corpus never shows. Refuses a slot whose real engine is unknown (WAH: no preset
-    in the corpus holds a real wah) — a wrong engine silences the preset on the pedal."""
+def _check_slot(slot: int) -> int:
     if not 0 <= int(slot) < N_BLOCKS:
         raise ValueError(f"block slot out of range: {slot}")
-    slot, type_ = int(slot), int(type_)
+    return int(slot)
+
+
+def _pick_engine(slot: int, type_: int) -> Optional[int]:
+    """The engine a pick of (slot, type_) writes, or None when none is known for sure."""
     if slot in NONE_SLOTS and type_ == NONE_TYPE:
         return ENGINE_BYPASS
-    default, by_type = ENGINES[slot]
-    engine = by_type.get(type_, default)
+    counts = ENGINES[slot][2]
+    if type_ in counts:  # (a) a seen pair: only when the corpus shows ONE engine for it
+        seen = counts[type_]
+        return next(iter(seen)) if len(seen) == 1 else None
+    # (b) an unseen type: only in a slot whose every seen type has the same engine
+    every = {e for seen in counts.values() for e in seen}
+    return next(iter(every)) if len(every) == 1 and slot not in MIXED_SLOTS else None
+
+
+def pick_allowed(slot: int, type_: int) -> bool:
+    """True when a model pick of effect `type_` in `slot` has an unambiguous engine byte:
+    the "None" model; a (slot, type) the corpus shows with exactly one engine; or any type
+    in a slot with one engine for every seen type (NR, EQ, DLY, RVB, VOL). Ambiguous pairs
+    (AMP 1, PRE 11, DST 117 today) and unseen types in PRE/WAH/DST/N->S/AMP/CAB/MOD are
+    refused: a wrong engine silences the preset on the pedal (hardware). The Explorer
+    greys such models out; keeps_stored_engine covers a re-pick of the stored model."""
+    return _pick_engine(_check_slot(slot), int(type_)) is not None
+
+
+def slot_engine(slot: int, type_: int) -> int:
+    """Engine byte for a pick of effect `type_` in `slot`: the "None" model is 0x06; else
+    the corpus engine when pick_allowed, otherwise ValueError (nothing is guessed)."""
+    slot, type_ = _check_slot(slot), int(type_)
+    engine = _pick_engine(slot, type_)
     if engine is None:
-        raise ValueError(f"no engine byte is known for a {SLOTS[slot]} effect (type {type_}) on the GP-150: "
-                         f"no preset read so far uses one — set it on the pedal, save and rescan")
+        raise ValueError(f"no unambiguous engine byte is known for {SLOTS[slot]} type {type_}: set it on the "
+                         f"pedal, save, rescan, run scripts/gp150_engines.py and copy the table into prst150.js ENGINES")
     return engine
+
+
+def keeps_stored_engine(slot: int, type_: int, stored_type: int, stored_engine: int) -> bool:
+    """True when picking `type_` re-picks the model already stored in `slot` (same type, and
+    the stored block is not the "None" effect — engine 0x06 outside VOL): the pick keeps
+    the stored engine, so a re-pick of an ambiguous type is never refused or rewritten.
+    A "None" pick is never a re-pick (it is always type 3 / 0x06 / off)."""
+    slot, type_ = _check_slot(slot), int(type_)
+    if slot in NONE_SLOTS and type_ == NONE_TYPE:
+        return False
+    return type_ == int(stored_type) and (int(stored_engine) != ENGINE_BYPASS or slot == VOL_SLOT)
 
 
 def is_none_model(slot: int, key: int) -> bool:
@@ -235,7 +276,9 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     addresses the slot's home record. "order" rewrites only the order table (records
     and engines untouched). A "models" edit writes the type and the slot's engine for
     it (slot_engine); picking a "None" model also turns the block off unless the edit's
-    bypass says otherwise. Device-owned bytes (0x0D..0x0F, 0x43C, 0x445) are never written."""
+    bypass says otherwise. A pick with no unambiguous engine raises (pick_allowed), unless
+    it re-picks the stored model, which keeps the stored engine (keeps_stored_engine).
+    Device-owned bytes (0x0D..0x0F, 0x43C, 0x445) are never written."""
     _check(prst)
     edits = edits or {}
     b = bytearray(prst)
@@ -244,7 +287,11 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     for slot, key in (edits.get("models") or {}).items():
         slot, key = int(slot), int(key)
         type_ = key & 0xFF
-        engine = slot_engine(slot, type_)
+        cur = block_of(b, slot)
+        if keeps_stored_engine(slot, type_, cur["type"], cur["engine"]):
+            engine = cur["engine"]  # a re-pick of the stored model: never refused, never rewritten
+        else:
+            engine = slot_engine(slot, type_)
         set_block(b, slot, type=type_, subtype=(key >> 8) & 0xFF, ext=(key >> 16) & 0xFF, engine=engine)
         if slot == AMP_SLOT and type_ in (2, 7):
             set_block(b, slot, ext=1)

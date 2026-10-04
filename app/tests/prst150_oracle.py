@@ -36,6 +36,22 @@ def _engine(slot, type_):
         return -1  # refused (no engine known)
 
 
+def _allowed(slot, type_):
+    return f150.pick_allowed(slot, type_)
+
+
+def _repick(b):
+    """Every slot re-picks the model stored in it (type, subtype, ext): a stored model
+    keeps its engine (keeps_stored_engine); None-stored slots are fresh picks."""
+    models = {}
+    for blk in f150.blocks_by_slot(b):
+        models[blk["slot"]] = f150.model_key(blk["slot"], blk["type"], blk["subtype"], blk["ext"])
+    try:
+        return base64.b64encode(f150.apply_edits(b, {"models": models})).decode()
+    except ValueError:
+        return None  # refused
+
+
 def main():
     files = sorted(glob.glob(os.path.join(ROOT, "re", "gp150", "evidence", "*.prst")))
     files += sorted(glob.glob(os.path.join(os.environ.get("GP180_DUMP_DIR", "/nonexistent"), "*.prst")))
@@ -54,12 +70,17 @@ def main():
             "editedNoneB64": base64.b64encode(f150.apply_edits(b, EDIT_NONE)).decode(),
             "editedNoneOnB64": base64.b64encode(f150.apply_edits(b, EDIT_NONE_ON)).decode(),
             "editedDlyB64": base64.b64encode(f150.apply_edits(b, EDIT_DLY)).decode(),
+            "repickB64": _repick(b),
         })
     json.dump({
         "edit": _strkeys(EDIT), "editNone": _strkeys(EDIT_NONE), "editNoneOn": _strkeys(EDIT_NONE_ON),
         "editDly": _strkeys(EDIT_DLY), "blank199B64": base64.b64encode(f150.blank(199)).decode(),
         "defaultOrder": f150.DEFAULT_ORDER, "defaultPos": f150.DEFAULT_POS,
         "slotEngine": [[_engine(s, t) for t in range(256)] for s in range(f150.N_BLOCKS)],
+        "pickAllowed": [[_allowed(s, t) for t in range(256)] for s in range(f150.N_BLOCKS)],
+        # keeps_stored_engine over every (slot, type, stored type, stored engine) that matters
+        "keeps": [[s, t, st, se, f150.keeps_stored_engine(s, t, st, se)]
+                  for s in range(f150.N_BLOCKS) for t in (0, 1, 3, 11, 117) for st in (1, 3, 11, 117) for se in (0, 1, 3, 6, 7)],
         "files": out,
     }, sys.stdout)
 

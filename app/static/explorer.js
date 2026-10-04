@@ -344,6 +344,8 @@
   // Set a block's (model, params): the shared core of "change model" and
   // "apply library block". savedParams (algId->value) win over model defaults.
   function applyModel(p, blkIdx, model, savedParams) {
+    const refused = window.ExplorerEdits.pickRefusal(devKey(), blkIdx, model.fxid, p.blocks[blkIdx]);
+    if (refused) { UI.toast(refused, "err"); return; } // GP-150: no unambiguous engine byte (the picker greys it out)
     const e = getEdit(p.slot);
     e.models[blkIdx] = model.fxid;
     e.override[blkIdx] = {
@@ -485,7 +487,10 @@
             `<span>${m.name}</span>` +
             (m.type ? ` <span class="picker-type">${m.type}</span>` : "") +
             (m.official ? ` <span class="subtitle">${m.official}</span>` : "");
-          btn.addEventListener("click", () => applyModel(p, blkIdx, m, null));
+          // GP-150: a model with no unambiguous engine byte stays listed, greyed out, with the reason
+          const why = window.ExplorerEdits.pickRefusal(devKey(), blkIdx, m.fxid, p.blocks[blkIdx]);
+          if (why) { btn.disabled = true; btn.classList.add("refused"); btn.title = why; }
+          else btn.addEventListener("click", () => applyModel(p, blkIdx, m, null));
           mlist.appendChild(btn);
         });
     }

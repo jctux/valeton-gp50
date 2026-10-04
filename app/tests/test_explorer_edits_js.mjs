@@ -13,6 +13,8 @@
  *  - the GP-150 chain strip: AMP pinned first, VOL pinned last (chainStripParts,
  *    pinChainEnds: a drop after VOL lands before it); a "None" pick also turns the
  *    block off (nonePick); a GP-150 preset needs a name (nameProblem);
+ *  - the model picker greys out a model with no unambiguous engine (pickRefusal ==
+ *    !PRST150.pickAllowed, except a re-pick of the stored model);
  *  - explorer.js / explorer.html actually use them.
  *   node app/tests/test_explorer_edits_js.mjs
  */
@@ -152,6 +154,39 @@ for (const name of EVID) {
   check("the pedal's reorder replayed via buildEditedBytes == the pedal's file (outside device bytes)", off.length === 0, off.map((i) => i.toString(16)).join());
 }
 
+// --- 2c. the model picker greys out picks with no unambiguous engine (pickRefusal) ----------
+// AMP type 1 is ambiguous in the corpus ({0x00: 18, 0x01: 2, 0x03: 4}); 100-active stores it
+// with 0x01, 024-Funky_Clean has AMP type 0 (0x00). A refused model stays listed, disabled.
+{
+  const act = lib.inventory([{ slot: 100, bytes: evidence("100-active.prst") }]).patches[0];
+  const funky = lib.inventory([{ slot: 24, bytes: evidence("024-Funky_Clean.prst") }]).patches[0];
+  const amp1 = pick("AMP", (m) => (m.fxid & 0xff) === 1), amp3 = pick("AMP", (m) => (m.fxid & 0xff) === 3);
+  check("patchlib: GP-150 blocks carry their engine byte", act.blocks[5].engine === 0x01 && act.blocks[5].type_code === 1 && funky.blocks[5].engine === 0x00);
+  const why = X.pickRefusal("gp150", 5, amp1.fxid, funky.blocks[5]);
+  check("pickRefusal: AMP type 1 over another amp -> the codec's refusal", /^no unambiguous engine byte is known for AMP type 1: set it on the pedal, save, rescan/.test(why || ""), why);
+  check("pickRefusal: AMP type 1 where it is already stored -> allowed (re-pick keeps 0x01)", X.pickRefusal("gp150", 5, amp1.fxid, act.blocks[5]) === null);
+  check("pickRefusal: AMP type 3 (never a real amp) -> refused", /AMP type 3/.test(X.pickRefusal("gp150", 5, amp3.fxid, act.blocks[5]) || ""));
+  check("pickRefusal: DLY / MOD None / NR Gate -> allowed", X.pickRefusal("gp150", 9, dlyModel.fxid, act.blocks[9]) === null && X.pickRefusal("gp150", 8, modNone.fxid, act.blocks[8]) === null && X.pickRefusal("gp150", 0, ((0 << 24) | 1) >>> 0, act.blocks[0]) === null);
+  check("pickRefusal: no stored block -> the plain rule", /AMP type 1/.test(X.pickRefusal("gp150", 5, amp1.fxid, null) || "") && X.pickRefusal("gp150", 9, dlyModel.fxid) === null);
+  check("pickRefusal: GP-5/GP-50 never refuse", X.pickRefusal("gp50", 5, 0x05000008, null) === null && X.pickRefusal(null, 2, 0x0200000b, null) === null);
+  // every ring model the picker lists for the GP-150: refused <=> the codec's pickAllowed says no
+  let bad = 0, refused = 0;
+  for (const blk of lib.BLOCK_NAMES) {
+    const s = lib.BLOCK_NAMES.indexOf(blk);
+    for (const m of lib.modelsForBlock(blk, [])) {
+      const r = X.pickRefusal("gp150", s, m.fxid, null);
+      if ((r === null) !== C150.pickAllowed(s, m.fxid & 0xff)) bad++;
+      if (r !== null) refused++;
+    }
+  }
+  check("pickRefusal == !pickAllowed over the whole GP-150 ring", bad === 0 && refused > 0, `${bad} mismatches, ${refused} refused`);
+  // the bytes: the stored re-pick keeps the engine; the refused pick throws in buildEditedBytes
+  const base = evidence("100-active.prst");
+  check("buildEditedBytes: re-picking the stored AMP type 1 is a no-op", hex(X.buildEditedBytes(base, "gp150", explorerSpec({ models: { 5: amp1.fxid } }))) === hex(base));
+  let err = null; try { X.buildEditedBytes(evidence("024-Funky_Clean.prst"), "gp150", explorerSpec({ models: { 5: amp1.fxid } })); } catch (e) { err = e; }
+  check("buildEditedBytes: AMP type 1 over AMP type 0 is refused", err && /AMP type 1/.test(err.message), err && err.message);
+}
+
 // --- 3. transport-family guard + GP-5/GP-50 unchanged -------------------------------------
 {
   const gp150 = evidence("000-New_GEN.prst");
@@ -261,6 +296,10 @@ for (const name of EVID) {
   check("explorer.js: setChainOrder refuses VOL not last", /L\.lockedLast && order\[n - 1\] !== L\.VOL_INDEX/.test(js));
   check("explorer.js: a drop past the end lands before the VOL tail", /\.chain-tail/.test(js));
   check("explorer.js: a pending None pick shows the block off", /ExplorerEdits\.nonePick\(devKey\(\), blkIdx, e\.models\[blkIdx\]\)/.test(js) && (js.match(/blockActive\(p\.slot, /g) || []).length >= 3);
+  check("explorer.js: the picker greys refused models out (disabled + title), keeps them listed",
+    /const why = window\.ExplorerEdits\.pickRefusal\(devKey\(\), blkIdx, m\.fxid, p\.blocks\[blkIdx\]\);/.test(js) && /btn\.disabled = true;/.test(js) && /btn\.title = why;/.test(js));
+  check("explorer.js: applyModel refuses a refused pick (library entries too)",
+    /function applyModel\(p, blkIdx, model, savedParams\) \{\n\s+const refused = window\.ExplorerEdits\.pickRefusal\(devKey\(\), blkIdx, model\.fxid, p\.blocks\[blkIdx\]\);\n\s+if \(refused\) \{ UI\.toast\(refused, "err"\); return; \}/.test(js));
   check("explorer.js: write/download refuse an empty GP-150 name", (js.match(/ExplorerEdits\.nameProblem\(devKey\(\), e\.name\)/g) || []).length >= 2);
   const at = (s) => html.indexOf(s);
   check("explorer.html loads explorer_edits.js after prst150.js and before explorer.js",

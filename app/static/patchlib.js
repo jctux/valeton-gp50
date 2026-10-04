@@ -131,7 +131,7 @@
           label_official: blockLabel(block, btype, official || model),
           params: paramsFor(e, floats, k),
         };
-        if (slotBlocks) blk.pos = slotBlocks[k].pos;
+        if (slotBlocks) { blk.pos = slotBlocks[k].pos; blk.engine = slotBlocks[k].engine; } // GP-150: the picker's re-pick rule needs the stored engine
         out.push(blk);
       });
       return out;

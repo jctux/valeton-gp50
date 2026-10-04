@@ -128,22 +128,146 @@ def test_write_order_requires_vol_last():
     assert "VOL" not in f150.MOVABLE and "AMP" not in f150.MOVABLE and len(f150.MOVABLE) == 10
 
 
+REFUSAL = "no unambiguous engine byte is known for"
+
+
+def _counts(t, s):
+    return {int(k): {int(e): n for e, n in c.items()} for k, c in t["slots"][s]["counts"].items()}
+
+
 def test_slot_engine_from_the_table():
+    # a (slot, type) pair the corpus shows with exactly ONE engine takes that engine
     t = _engine_table()
     for s, row in enumerate(t["slots"]):
-        for type_, eng in row["engines"].items():
-            assert f150.slot_engine(s, int(type_)) == eng, (row["slot"], type_)
+        for type_, seen in _counts(t, s).items():
+            if len(seen) == 1:
+                assert f150.slot_engine(s, type_) == next(iter(seen)), (row["slot"], type_)
+                assert f150.pick_allowed(s, type_)
     assert f150.slot_engine(9, 13) == 0x0B  # DLY Sweet Echo
     assert f150.slot_engine(10, 3) == 0x0C and f150.slot_engine(3, 3) == 0x07  # real type 3s
     assert f150.slot_engine(8, 41) == 0x01 and f150.slot_engine(6, 60) == 0x0A
     assert f150.slot_engine(11, 3) == 0x06  # VOL
-    # a type the corpus never shows: the slot's most common real engine
-    assert f150.slot_engine(4, 57) == 0x00 and f150.slot_engine(5, 3) == 0x00 and f150.slot_engine(9, 40) == 0x0B
-    # no preset holds a real wah: no engine is known, so a wah pick is refused
     with pytest.raises(ValueError, match="WAH"):
-        f150.slot_engine(2, 4)
+        f150.slot_engine(2, 4)  # no preset holds a real wah
     with pytest.raises(ValueError):
         f150.slot_engine(12, 1)
+    with pytest.raises(ValueError):
+        f150.pick_allowed(12, 1)
+
+
+@pytest.mark.parametrize("slot,type_", [(5, 1), (1, 11), (3, 117), (5, 3)])
+def test_ambiguous_or_unseen_amp_pre_dst_picks_are_refused(slot, type_):
+    # AMP type 1 {0x00: 18, 0x01: 2, 0x03: 4}, PRE 11 {0x00: 1, 0x03: 3}, DST 117
+    # {0x07: 1, 0x08: 1}: the corpus shows 2-3 engines, so the majority is a guess; AMP
+    # type 3 (Bellman 59N) is never a real amp in the corpus. A wrong engine silences the
+    # preset on the pedal (hardware), so the pick is refused.
+    assert not f150.pick_allowed(slot, type_)
+    with pytest.raises(ValueError, match=f"{REFUSAL} {f150.SLOTS[slot]} type {type_}: set it on the pedal, save, rescan"):
+        f150.slot_engine(slot, type_)
+    with pytest.raises(ValueError, match=REFUSAL):
+        f150.apply_edits(f150.blank(3), {"models": {slot: f150.model_key(slot, type_)}})
+    msg = ""
+    try:
+        f150.slot_engine(slot, type_)
+    except ValueError as e:
+        msg = str(e)
+    assert "run scripts/gp150_engines.py and copy the table into prst150.js ENGINES" in msg
+
+
+def test_single_engine_slots_take_their_engine_for_any_type():
+    # NR, EQ, DLY, RVB (and VOL) show one engine for every seen type: an unseen type
+    # takes it too
+    assert f150.pick_allowed(9, 40) and f150.slot_engine(9, 40) == 0x0B  # DLY, never seen
+    assert f150.slot_engine(9, 2) == 0x0B and f150.slot_engine(9, 5) == 0x0B
+    for type_ in (0, 1, 2, 3, 4, 6, 8, 9, 13, 18):  # every seen RVB type
+        assert f150.slot_engine(10, type_) == 0x0C
+    for type_ in (1, 7, 8, 16, 33):  # NR: seen 1/7/8, unseen 16/33
+        assert f150.slot_engine(0, type_) == 0x05
+    assert f150.slot_engine(7, 25) == 0x01  # EQ, never seen
+    assert f150.slot_engine(11, 3) == 0x06  # VOL
+
+
+def test_multi_engine_slots_refuse_unseen_types():
+    # CAB type 60 shows only 0x0A: allowed; a CAB type the corpus never shows: refused
+    assert f150.pick_allowed(6, 60) and f150.slot_engine(6, 60) == 0x0A
+    for slot, type_ in ((6, 33), (1, 7), (3, 33), (5, 4), (8, 54)):  # CAB, PRE, DST, AMP, MOD
+        assert not f150.pick_allowed(slot, type_), (slot, type_)
+        with pytest.raises(ValueError, match=REFUSAL):
+            f150.slot_engine(slot, type_)
+    # N->S shows one engine (0x00), but only for its two NAM types: its SnapTone DST /
+    # CAB IR / Bass AMP models are other kinds of effect, so an unseen type is refused
+    assert f150.slot_engine(4, 27) == 0x00 and f150.slot_engine(4, 33) == 0x00
+    for type_ in (57, 64, 112, 122):
+        assert not f150.pick_allowed(4, type_)
+    assert not any(f150.pick_allowed(2, t) for t in range(256) if t != f150.NONE_TYPE)  # WAH
+
+
+def test_pick_allowed_matches_the_committed_counts():
+    # the rule, checked over the whole committed table: a seen (slot, type) is allowed iff
+    # it has one engine; an unseen one iff its slot is single-engine and not N->S
+    t = _engine_table()
+    single = set()
+    for s in range(f150.N_BLOCKS):
+        c = _counts(t, s)
+        engines = {e for seen in c.values() for e in seen}
+        if len(engines) == 1 and s != 4:
+            single.add(f150.SLOTS[s])
+        for type_ in range(256):
+            if s in f150.NONE_SLOTS and type_ == f150.NONE_TYPE:
+                want = True
+            elif type_ in c:
+                want = len(c[type_]) == 1
+            else:
+                want = f150.SLOTS[s] in single
+            assert f150.pick_allowed(s, type_) == want, (f150.SLOTS[s], type_)
+            if want:
+                f150.slot_engine(s, type_)
+            else:
+                with pytest.raises(ValueError, match=REFUSAL):
+                    f150.slot_engine(s, type_)
+    assert single == {"NR", "EQ", "DLY", "RVB", "VOL"}
+    ambiguous = {(f150.SLOTS[s], k) for s in range(f150.N_BLOCKS) for k, v in _counts(t, s).items() if len(v) > 1}
+    assert ambiguous == {("AMP", 1), ("PRE", 11), ("DST", 117)}
+
+
+def test_repick_of_the_stored_type_keeps_the_stored_engine():
+    # 100-active: AMP type 1 with engine 0x01 (AMP 1 is ambiguous: the majority is 0x00).
+    # Re-picking the model already there is no change: no refusal, no rewrite.
+    b = _active()
+    amp = f150.blocks_by_slot(b)[5]
+    assert (amp["type"], amp["engine"]) == (1, 0x01)
+    assert f150.keeps_stored_engine(5, 1, 1, 0x01)
+    out = f150.apply_edits(b, {"models": {5: f150.model_key(5, 1, amp["subtype"], amp["ext"])}})
+    assert out == b
+    # PRE 11 stored with 0x00 (011-Gypsy_of_AT) and with 0x03 (078-Organ_Synth): each kept
+    for name, eng in (("011-Gypsy_of_AT.prst", 0x00), ("078-Organ_Synth.prst", 0x03)):
+        g = _evidence(name)
+        pre = f150.blocks_by_slot(g)[1]
+        assert (pre["type"], pre["engine"]) == (11, eng)
+        out = f150.apply_edits(g, {"models": {1: f150.model_key(1, 11, pre["subtype"], pre["ext"])}})
+        assert out == g, name
+    # ... but another ambiguous type is still refused in that slot
+    with pytest.raises(ValueError, match=REFUSAL):
+        f150.apply_edits(_evidence("099-Finger_AC.prst"), {"models": {1: f150.model_key(1, 11)}})
+
+
+def test_repick_over_a_none_block_is_a_new_pick():
+    # a None block (engine 0x06) is not the real type-3 model of its slot: picking that
+    # model takes the table's engine (DST type 3 = Penesas: 0x07), or is refused when
+    # none is known (AMP type 3: New GEN.'s AMP is None)
+    b = _active()
+    dst = f150.blocks_by_slot(b)[3]
+    assert (dst["type"], dst["engine"]) == (3, 0x06)
+    assert not f150.keeps_stored_engine(3, 3, 3, 0x06)
+    out = f150.apply_edits(b, {"models": {3: f150.model_key(3, 3)}})
+    assert f150.blocks_by_slot(out)[3]["engine"] == 0x07
+    g = _new_gen()
+    assert (f150.blocks_by_slot(g)[5]["type"], f150.blocks_by_slot(g)[5]["engine"]) == (3, 0x06)
+    with pytest.raises(ValueError, match="AMP type 3"):
+        f150.apply_edits(g, {"models": {5: f150.model_key(5, 3)}})
+    # VOL's real "Volume" carries 0x06: a re-pick keeps it
+    assert f150.keeps_stored_engine(11, 3, 3, 0x06)
+    assert f150.apply_edits(g, {"models": {11: f150.model_key(11, 3)}}) == g
 
 
 def test_slot_engine_none_model():
