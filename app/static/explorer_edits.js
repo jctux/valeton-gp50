@@ -75,6 +75,8 @@
   // Longest preset name the editor allows: the codec layout's nameMax (GP-150: 13,
   // spec §3.2); GP-5/GP-50: 10 (factory names top out at 10).
   const nameMax = (key) => codecOf(key).layout.nameMax || 10;
+  // GP-150 stores BPM in one byte (0x24); the GP-5/GP-50 slider range stays 40..300
+  const bpmMax = (key) => (key === "gp150" ? 255 : 300);
 
   // What "Clear preset" writes to `slot`: GP-150 — factory "New GEN." with the slot's
   // index byte; GP-5/GP-50 — the slot-independent "GP-50" blank.
@@ -95,7 +97,7 @@
     return writes.filter((w) => !String(names[w.from] || "").trim());
   }
 
-  const API = { buildEditedBytes, nameMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, chainBlocks, EMPTY_LABEL };
+  const API = { buildEditedBytes, nameMax, bpmMax, nameProblem, blankFor, rowName, emptySourceWrites, nonePick, chainStripParts, pinChainEnds, chainBlocks, EMPTY_LABEL };
   if (typeof module !== "undefined" && module.exports) module.exports = API;
   else root.ExplorerEdits = API;
 })(typeof self !== "undefined" ? self : this);

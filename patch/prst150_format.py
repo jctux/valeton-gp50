@@ -117,7 +117,7 @@ def write_vol_bpm(b: bytearray, vol: Optional[int] = None, bpm: Optional[int] = 
     if vol is not None:
         b[VOL_OFF] = max(0, min(100, int(vol)))
     if bpm is not None:
-        b[BPM_OFF] = int(bpm) & 0xFF  # only the low byte is stored (spec §2)
+        b[BPM_OFF] = max(40, min(255, int(bpm)))  # one byte at 0x24 (0x25 is 0 in every scanned preset); clamp, never truncate
 
 
 def read_order(b: bytes) -> List[int]:

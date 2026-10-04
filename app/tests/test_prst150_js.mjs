@@ -89,6 +89,11 @@ check("isNoneModel mirror", typeof P.isNoneModel === "function" && P.isNoneModel
   check("pedal file: DLY = record 9, Sweet Echo 0x0B on, chain position 10", dly.rec === 9 && dly.pos === 10 && dly.type === 13 && dly.engine === 0x0b && dly.enabled === 1);
   check("pedal file: RVB = record 10, None, chain position 6", rvb.rec === 10 && rvb.pos === 6 && rvb.type === 3 && rvb.engine === 0x06 && rvb.enabled === 0);
 }
+{ // BPM clamp (one byte at 0x24): 300 -> 255, 10 -> 40, never truncated by & 0xff
+  const b = P.blankPrst(3); P.writeVolBpm(b, null, 300); check("bpm 300 clamps to 255", P.readVolBpm(b)[1] === 255);
+  P.writeVolBpm(b, null, 10); check("bpm 10 clamps to 40", P.readVolBpm(b)[1] === 40);
+  const out = P.applyEdits(P.blankPrst(3), { settings: { bpm: 300 } }); check("applyEdits bpm 300 -> 255", P.readVolBpm(out)[1] === 255);
+}
 console.log(`prst150.js: ${pass} passed, ${fail} failed (${O.files.length} files)`);
 for (const f of fails) console.log("  FAIL " + f);
 process.exit(fail ? 1 : 0);

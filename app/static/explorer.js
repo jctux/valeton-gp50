@@ -792,7 +792,7 @@
         return wrap;
       };
       if (s.patch_vol !== undefined) ps.appendChild(mk("Patch VOL", "patch_vol", 0, 100, s.patch_vol));
-      if (s.bpm !== undefined) ps.appendChild(mk("BPM", "bpm", 40, 300, s.bpm));
+      if (s.bpm !== undefined) ps.appendChild(mk("BPM", "bpm", 40, window.ExplorerEdits.bpmMax(devKey()), s.bpm));
       d.appendChild(ps);
     }
 

@@ -267,4 +267,6 @@ for (const name of EVID) {
     at("explorer_edits.js") > at("prst150.js") && at("prst150.js") > 0 && at("explorer_edits.js") < at("/static/explorer.js"));
 }
 
+check("bpmMax gp150 = 255 (one-byte BPM), gp50/gp5 = 300", X.bpmMax("gp150") === 255 && X.bpmMax("gp50") === 300 && X.bpmMax("gp5") === 300);
 console.log(`explorer edits: ${pass} passed, ${fail} failed`); for (const f of fails) console.log("  FAIL " + f); process.exit(fail ? 1 : 0);
+

@@ -60,7 +60,7 @@
   function readName(b) { b = u8(b); let s = ""; for (let i = NAME_OFF; i < NAME_OFF + NAME_LEN; i++) { if (b[i] === 0) break; s += String.fromCharCode(b[i]); } return s.trim(); }
   function writeName(b, name) { const n = Math.min(name.length, NAME_LEN - 1); for (let i = 0; i < NAME_LEN; i++) b[NAME_OFF + i] = i < n ? name.charCodeAt(i) & 0xff : 0; }
   const readVolBpm = (b) => { b = u8(b); return [b[VOL_OFF], b[BPM_OFF]]; };
-  function writeVolBpm(b, vol, bpm) { if (vol != null) b[VOL_OFF] = Math.max(0, Math.min(100, Math.trunc(Number(vol)))); if (bpm != null) b[BPM_OFF] = Math.trunc(Number(bpm)) & 0xff; }
+  function writeVolBpm(b, vol, bpm) { if (vol != null) b[VOL_OFF] = Math.max(0, Math.min(100, Math.trunc(Number(vol)))); if (bpm != null) b[BPM_OFF] = Math.max(40, Math.min(255, Math.trunc(Number(bpm)))); }
   const readOrder = (b) => Array.from(u8(b).subarray(ORDER_OFF, ORDER_OFF + N_BLOCKS));
   function isPermutation(order) { if (!order || order.length !== N_BLOCKS) return false; const seen = new Set(); for (const v of order) { if (!Number.isInteger(v) || v < 0 || v >= N_BLOCKS || seen.has(v)) return false; seen.add(v); } return true; }
   // offset of `slot`'s record: its fixed home index, never the chain position

@@ -381,3 +381,13 @@ def test_none_pick_is_type_3_engine_6_off():
             out = f150.apply_edits(base, {"models": {slot: f150.model_key(slot, 3)}})
             blk = f150.blocks_by_slot(out)[slot]
             assert (blk["type"], blk["engine"], blk["enabled"]) == (3, 0x06, 0), slot
+
+
+def test_bpm_is_clamped_to_one_byte_not_truncated():
+    # BPM is one byte at 0x24 (0x25 is 0 in all 200 scanned presets); the Explorer's slider
+    # used to go to 300, which `& 0xFF` turned into 44.
+    b = bytearray(f150.blank(3))
+    f150.write_vol_bpm(b, bpm=300); assert f150.read_vol_bpm(b)[1] == 255
+    f150.write_vol_bpm(b, bpm=10); assert f150.read_vol_bpm(b)[1] == 40
+    f150.write_vol_bpm(b, bpm=120); assert f150.read_vol_bpm(b)[1] == 120
+    out = f150.apply_edits(f150.blank(3), {"settings": {"bpm": 300}}); assert f150.read_vol_bpm(out)[1] == 255
