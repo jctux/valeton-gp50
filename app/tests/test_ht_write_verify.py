@@ -207,6 +207,8 @@ def wire_log(pedal):
         f = ht.parse_frame(w)
         if w == ht.hello():
             out.append("hello")
+        elif w == ht.session_open() or w == ht.ack(1):
+            continue  # the session open + its ident ACK are part of hello() (power-cycled pedal fix, 2026-10-04)
         elif f.family == ht.FAMILY_PRESET_REQ:
             p = ht.parse_logical(ht.dec(f.body[1:]))
             out.append(f"read {p[8] | (p[9] << 8)}")
