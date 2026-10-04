@@ -19,8 +19,10 @@
  * GP-150 (HT transport): a 1128-byte preset becomes Suite's whole-preset import
  * stream (family-0x70 chunks, ht_proto.js importStream), byte-exact against the
  * captured Suite import (app/tests/test_write_gp150_js.mjs); validateStream
- * re-parses every frame. Never sent while WRITE_VERIFIED.gp150 is false unless
- * allowUnverified (the supervised hardware verification write only).
+ * re-parses every frame. WRITE_VERIFIED.gp150 is true since the 2026-10-04
+ * hardware round trip on slot 199 (re/gp150/DEVICE_WRITE.md), with the Explorer's
+ * edit flows on the GP-150 codec; set it false again to refuse every GP-150 write
+ * that lacks allowUnverified.
  */
 (function (root) {
   const PRST = root.PRST || (typeof module !== "undefined" && module.exports ? require("./prst.js") : null);
@@ -34,8 +36,9 @@
   const PATCH_BLOCK = 19; // payload bytes per write block
   const PATCH_HDR = [0x11, 0x4f]; // constant marker before the slot byte
   const NAME_OFF = 0x19;
-  // Which devices' WRITE protocol is capture-verified (see device_write.py).
-  const WRITE_VERIFIED = { gp50: true, gp5: false, gp150: false };
+  // Which devices' WRITE protocol is verified (see device_write.py). gp150: hardware
+  // round trip on slot 199, 2026-10-04 (re/gp150/DEVICE_WRITE.md).
+  const WRITE_VERIFIED = { gp50: true, gp5: false, gp150: true };
   const ACK_WAIT_MS = 150; // wait for the device ACK after each block (shallow queue)
   const GP150_TRANSFER_ID = 0x24; // the transfer id Suite used in the captured import
 
@@ -192,8 +195,8 @@
   // protocol is verified. GP-5/GP-50: paces like Suite, one block, wait for the
   // device ACK (up to ACK_WAIT_MS), then the next. GP-150: the import stream via
   // the HT session (WebMidiDevice._sendStream -> HtTransport writePreset), resolving
-  // {sent, acks, notified}; refused while WRITE_VERIFIED.gp150 is false unless
-  // allowUnverified.
+  // {sent, acks, notified}; would be refused without allowUnverified if
+  // WRITE_VERIFIED.gp150 were false.
   async function writeSlot(slot, prst, { confirm = false, allowUnverified = false } = {}) {
     const dev = root.WebMidiDevice;
     if (!dev || !dev.isConnected()) throw new Error("not connected — WebMidiDevice.connect() first");
@@ -210,7 +213,7 @@
     }
     if (!allowUnverified) {
       if (key === "gp150" && !WRITE_VERIFIED.gp150) {
-        throw new Error("refusing to send: GP-150 writes are unverified — the import stream matches Suite's capture but has not been tested on a GP-150 yet (WRITE_VERIFIED.gp150 is false). Pass { allowUnverified: true } only for the supervised verification write.");
+        throw new Error("refusing to send: GP-150 writes are switched off (WRITE_VERIFIED.gp150 is false) — they are unverified in this build. Pass { allowUnverified: true } only for a supervised verification write.");
       }
       if (!key) throw new Error("refusing to send: unrecognized patch-write stream (matches no known preset length)");
       if (!WRITE_VERIFIED[key]) {

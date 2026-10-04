@@ -6,8 +6,11 @@
  *  - HtTransport.writePreset against a scripted fake pedal: chunks in order and
  *    paced, ACK + 0x08 awaited, the 0x08 ACKed exactly once (by the session's own
  *    handler, which stays installed), clear errors on silence;
- *  - writeSlot / _sendStream refuse the GP-150 while WRITE_VERIFIED.gp150 is false
- *    unless allowUnverified, sending zero bytes; GP-5/GP-50 writeSlot unchanged.
+ *  - the gate: WRITE_VERIFIED.gp150 is true (hardware-verified 2026-10-04, slot 199;
+ *    the Explorer's edit flows go through the GP-150 codec), so writeSlot sends with
+ *    { confirm: true }; it still refuses without confirm, a preset of the other
+ *    device family, and — if the flag is turned off again — anything without
+ *    allowUnverified, sending zero bytes; GP-5/GP-50 writeSlot unchanged.
  *   node app/tests/test_write_gp150_js.mjs
  */
 import { readFileSync, existsSync } from "node:fs";
@@ -158,7 +161,8 @@ function reframe(w, { piece, idx, tid, off, family } = {}) {
   check("legacy map: a 1109-byte 0x1D stream is rejected", r[0] === false && /1109/.test(r[1]), r[1]);
   check("legacy map: ... and infers no device", WW.inferDeviceKey(bogus) === null);
   check("inferDeviceKey: HT stream -> gp150", WW.inferDeviceKey(WW.buildPatchWriteStream(finger, 3)) === "gp150");
-  check("WRITE_VERIFIED.gp150 is false", WW.WRITE_VERIFIED.gp150 === false);
+  check("WRITE_VERIFIED.gp150 is true (verified on hardware)", WW.WRITE_VERIFIED.gp150 === true);
+  check("WRITE_VERIFIED: GP-50 true, GP-5 still false", WW.WRITE_VERIFIED.gp50 === true && WW.WRITE_VERIFIED.gp5 === false);
 }
 
 // --- 5. HtTransport.writePreset against a fake pedal -------------------------------
@@ -375,25 +379,48 @@ const READ_BACK = /read slot 199 back before retrying/;
   const info = await D.connect();
   check("device: GP-150 connected", info.key === "gp150");
   const n0 = p150.sent.length; // the hello
-  let r = await rejects(WW.writeSlot(199, finger, { confirm: true }), /unverified/);
-  check("gate: writeSlot(gp150) without allowUnverified refuses", r.ok, r.why);
-  r = await rejects(WW.writeSlot(199, finger, { confirm: true, allowUnverified: false }), /GP-150/);
-  check("gate: the refusal names the GP-150", r.ok, r.why);
-  r = await rejects(WW.writeSlot(199, finger, { allowUnverified: true }), /confirm/);
+  // refusals first: none of them may move a byte
+  let r = await rejects(WW.writeSlot(199, finger, {}), /confirm/);
   check("gate: writeSlot without confirm refuses", r.ok, r.why);
-  let syncErr = null; try { D._sendStream(pk199, { confirm: true, validated: true }); } catch (e) { syncErr = e; }
-  check("gate: _sendStream(ht) without allowUnverified refuses", syncErr && /not verified|unverified/.test(syncErr.message) && /GP-150/.test(syncErr.message), syncErr && syncErr.message);
+  r = await rejects(WW.writeSlot(199, finger, { allowUnverified: true }), /confirm/);
+  check("gate: writeSlot without confirm refuses even with allowUnverified", r.ok, r.why);
+  let syncErr = null; try { D._sendStream(pk199, { validated: true }); } catch (e) { syncErr = e; }
+  check("gate: _sendStream(ht) without confirm refuses", syncErr && /confirm/.test(syncErr.message), syncErr && syncErr.message);
+  syncErr = null; try { D._sendStream(pk199, { confirm: true }); } catch (e) { syncErr = e; }
+  check("gate: _sendStream(ht) without validated refuses", syncErr && /validated/.test(syncErr.message), syncErr && syncErr.message);
   syncErr = null; try { D._sendStream([WW.buildPacket(0x1d, 0, [1])], { confirm: true, validated: true, allowUnverified: true }); } catch (e) { syncErr = e; }
   check("gate: _sendStream(ht) refuses legacy packets", syncErr && /HT/.test(syncErr.message), syncErr && syncErr.message);
   const gp50 = PRST.convert(new Uint8Array(readFileSync(resolve(here, "fixtures/gp5/65-Puppy.prst"))), "gp50");
-  r = await rejects(WW.writeSlot(7, gp50, { confirm: true, allowUnverified: true }), /GP-150|connected/);
+  r = await rejects(WW.writeSlot(7, gp50, { confirm: true }), /GP-150|connected/);
   check("gate: a GP-50 preset is not written to a GP-150", r.ok, r.why);
+  r = await rejects(WW.writeSlot(7, gp50, { confirm: true, allowUnverified: true }), /GP-150|connected/);
+  check("gate: ... not even with allowUnverified", r.ok, r.why);
+  // the flag still gates: turned off, both layers refuse without allowUnverified
+  const shipped = WW.WRITE_VERIFIED.gp150;
+  WW.WRITE_VERIFIED.gp150 = false;
+  r = await rejects(WW.writeSlot(199, finger, { confirm: true }), /unverified/);
+  check("gate off: writeSlot(gp150) refuses without allowUnverified", r.ok && /GP-150/.test(r.why), r.why);
+  syncErr = null; try { D._sendStream(pk199, { confirm: true, validated: true }); } catch (e) { syncErr = e; }
+  check("gate off: _sendStream(ht) refuses without allowUnverified", syncErr && /WRITE_VERIFIED\.gp150 is false/.test(syncErr.message) && /GP-150/.test(syncErr.message), syncErr && syncErr.message);
+  WW.WRITE_VERIFIED.gp150 = shipped; // back to the value webmidi_write.js ships
   check("gate: every refusal sent zero bytes", p150.sent.length === n0, `${n0} -> ${p150.sent.length}`);
-  const w = await WW.writeSlot(199, finger, { confirm: true, allowUnverified: true });
-  check("allowUnverified: writeSlot resolves {sent, acks, notified}", w && w.sent === 10 && w.acks === 1 && w.notified === true, JSON.stringify(w));
+
+  // gate open: { confirm: true } is enough
+  const w = await WW.writeSlot(199, finger, { confirm: true });
+  check("verified: writeSlot(gp150, {confirm:true}) resolves {sent, acks, notified}", w && w.sent === 10 && w.acks === 1 && w.notified === true, JSON.stringify(w));
   const chunks = p150.sent.slice(n0, n0 + 10);
-  check("allowUnverified: the validated slot-199 stream went out", chunks.length === 10 && pk199.every((x, i) => hex(x) === hex(chunks[i])));
-  check("allowUnverified: 0x08 ACKed once", p150.acksFor(NOTIFY_TX) === 1);
+  check("verified: the validated slot-199 stream went out", chunks.length === 10 && pk199.every((x, i) => hex(x) === hex(chunks[i])));
+  check("verified: 0x08 ACKed once", p150.acksFor(NOTIFY_TX) === 1);
+  // the index byte comes from the target slot, not the file (Finger AC is index 99)
+  const n1 = p150.sent.length;
+  const w2 = await WW.writeSlot(5, finger, { confirm: true });
+  const pk5 = WW.buildPatchWriteStream(finger, 5);
+  check("verified: a write to slot 5 sends the slot-5 stream", w2.notified === true && pk5.every((x, i) => hex(x) === hex(p150.sent[n1 + i])) && finger[4] === 99);
+  const n2 = p150.sent.length;
+  const w3 = await D._sendStream(pk199, { confirm: true, validated: true });
+  check("verified: _sendStream(ht) with confirm+validated sends", w3 && w3.notified === true && pk199.every((x, i) => hex(x) === hex(p150.sent[n2 + i])), JSON.stringify(w3));
+  const w4 = await WW.writeSlot(199, finger, { confirm: true, allowUnverified: true });
+  check("verified: allowUnverified is harmless", w4 && w4.notified === true);
   D.disconnect();
 
   // GP-5/GP-50 writeSlot is unchanged: same packets, one ACK-paced block at a time
