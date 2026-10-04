@@ -176,6 +176,7 @@ function importPedal({ ack = true, notify = true, notifyRaw = MSG.import_notify_
     sent.push(w); sentAt.push(Date.now());
     if (dead) return;
     if (f.family === 0x00 && f.tx4[1] === 0x01) return emit(MSG.hello_reply);
+    if (f.family === 0x0c) { emit(MSG.ack_tx0); return emit(MSG.ident_reply, 3); } // hello()'s session open
     if (f.family !== HT.FAMILY_PATCH || !HT.isChunk(f)) return;
     if (onChunk) onChunk(f.body[0], { emit, deliver });
     if (w.length < HT.FULL_WIRE_LEN) {

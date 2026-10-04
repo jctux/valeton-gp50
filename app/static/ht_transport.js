@@ -13,7 +13,8 @@
  * so unsolicited device messages between requests still get ACKed.
  *
  *   const s = HtTransport.create(input, output);
- *   await s.hello();                  // true when the pedal answers the handshake
+ *   await s.hello();                  // true when the pedal answers the handshake AND the
+ *                                     // 0x0C session open (s.sessionOpened())
  *   const prst = await s.readPreset(7); // Uint8Array(1128), or null for an empty slot
  *   await s.selectSlot(7);            // switch the pedal (read request with flag 0)
  *   await s.writePreset(packets);     // import stream -> {sent, acks, notified}. UNGATED
@@ -42,7 +43,7 @@
       if (o.log) o.log(level, msg, detail);
       else if (level === "warn" && typeof console !== "undefined") console.warn(`[ht] ${msg}`);
     };
-    let chain = Promise.resolve(), tx = 0x10, closed = false, badFrames = 0;
+    let chain = Promise.resolve(), tx = 0x10, closed = false, badFrames = 0, sessionOpen = false;
     let current = null, abortCurrent = null; // the in-flight exchange's frame handler / aborter
 
     // tx ids travel as one SysEx data byte: 1..0x7F (0 means "no id"; 0x80+ is a status byte).
@@ -165,11 +166,20 @@
 
     const request = (wire, opts2) => job(() => exchange(wire, opts2));
 
-    // The handshake: host `00 01 03 00` -> pedal `00 02 03 00` (a frame, not an ACK).
+    // The handshake: host `00 01 03 00` -> pedal `00 02 03 00` (a frame, not an ACK),
+    // then the Suite's family-0x0C session open as its own exchange: the pedal ACKs it
+    // (tx 0) and sends its ident reply (family 0x10, tx 1), which onMessage ACKs once.
+    // A power-cycled GP-150 ACKs preset reads but streams nothing until the session is
+    // open (2026-10-04), so hello() is true only when the ident reply arrived. Both
+    // exchanges are bounded by idleMs after their ACK / timeoutMs.
     const isHandshakeReply = (f) => f.family === HT.FAMILY_ACK && f.tx4[1] === 0x02;
     async function alive() {
+      sessionOpen = false;
       const r = await exchange(HT.hello(), { until: isHandshakeReply }); // an unsolicited 0x18 must not end it
-      return r.frames.some(isHandshakeReply);
+      if (!r.frames.some(isHandshakeReply) || closed) return false;
+      const o = await exchange(HT.sessionOpen(), { until: HT.isIdentReply });
+      sessionOpen = o.frames.some(HT.isIdentReply);
+      return sessionOpen;
     }
     const hello = () => job(alive);
 
@@ -334,7 +344,7 @@
       if (input.onmidimessage === onMessage) input.onmidimessage = null;
     }
 
-    return { request, hello, readPreset, selectSlot, writePreset, nextTx, close, stats: () => ({ badFrames }), _send: send };
+    return { request, hello, sessionOpened: () => sessionOpen, readPreset, selectSlot, writePreset, nextTx, close, stats: () => ({ badFrames }), _send: send };
   }
 
   const API = { create, DEFAULTS, NOT_RESPONDING };

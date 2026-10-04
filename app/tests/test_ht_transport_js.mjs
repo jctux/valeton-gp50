@@ -35,8 +35,11 @@ const LIVE = { ...FAST, timeoutMs: 5000, idleMs: 1000 };
 //   dropChunk  — index of a chunk to leave out (gap -> stream error)
 //   onRead({n, slot, ack, stream}) — script the reply to the n-th 0x0f request
 //   onHello({reply, stream})       — script the reply to a hello
-function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-150", onRead = null, onHello = null } = {}) {
-  const sent = []; const input = { name, onmidimessage: null }; let ackedFinal = 0, reads = 0;
+//   needsSession   — a power-cycled pedal (2026-10-04): reads are ACKed but nothing is
+//                    streamed until the family-0x0C session open has been seen
+//   answersSession — false: the 0x0C is ACKed (tx 0) but no ident reply follows
+function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-150", onRead = null, onHello = null, needsSession = false, answersSession = true } = {}) {
+  const sent = []; const input = { name, onmidimessage: null }; let ackedFinal = 0, reads = 0, sessionOpen = false;
   const deliver = (u8) => input.onmidimessage && input.onmidimessage({ data: u8 });
   const emit = (u8, ms = 1) => setTimeout(() => deliver(u8), ms);
   // mutate(chunk, i) -> chunk lets a test corrupt one chunk of one stream
@@ -46,6 +49,11 @@ function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-
     if (dead) return;
     if (f.family === 0x00 && f.tx4[1] === 0x01) return onHello ? onHello({ reply: (ms = 1) => emit(MSG.hello_reply, ms), stream }) : emit(MSG.hello_reply);
     if (f.family === 0x00) { if (f.tx4[3] === 0x0c) ackedFinal++; return; }
+    if (f.family === 0x0c) { // the Suite's session open: ACK (tx 0) + ident reply (family 0x10, tx 1)
+      emit(MSG.ack_tx0);
+      if (answersSession) { sessionOpen = true; emit(MSG.ident_reply, 3); }
+      return;
+    }
     if (f.family === 0x0f) {
       const payload = reqPayload(w);
       const slot = payload[8] | (payload[9] << 8);
@@ -54,12 +62,17 @@ function fakePedal({ ackSilent = true, dead = false, dropChunk = -1, name = "GP-
       if (slot === 199 && !ackSilent) return; // no ACK, no stream
       emit(HT.ack(f.tx4[3]));
       if (slot === 199) return; // empty slot: silence after the ACK
+      if (needsSession && !sessionOpen) return; // power-cycled: ACK, but no stream until the session is open
       stream();
     }
   } };
-  return { input, output, sent, deliver, finalAcks: () => ackedFinal, reads: () => reads };
+  const acksFor = (id) => sent.filter((w) => hex(w) === hex(HT.ack(id))).length;
+  return { input, output, sent, deliver, finalAcks: () => ackedFinal, reads: () => reads, acksFor };
 }
 const isHelloReq = (w) => w[3] === 0x00 && w[5] === 0x01;
+const isSessionOpen = (w) => w[3] === 0x0c;
+// what hello() puts on the wire: the handshake, the session open, the ACK of the ident reply
+const HELLO_WIRE = [MSG.hello, MSG.settings_read, MSG.ack_tx1_host].map(hex).join();
 
 // --- brief scenario --------------------------------------------------------------
 const pedal = fakePedal();
@@ -134,6 +147,53 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   check("final chunk ACK sent before the callback returns", syncAck === true);
   check("sync-fed stream assembles", p && p.length === 1128);
   s4.close();
+}
+
+// --- session open (2026-10-04): a power-cycled pedal streams nothing until it is open --
+{
+  const p = fakePedal({ needsSession: true });
+  const ss = T.create(p.input, p.output, LIVE);
+  check("session: hello() -> true", await ss.hello() === true);
+  await sleep(20); // any late duplicate ACK would land here
+  check("session: hello() = handshake, 0x0C session open, ACK of the ident reply", p.sent.map(hex).join() === HELLO_WIRE, p.sent.map(hex).join(" "));
+  check("session: ident reply (tx 1) ACKed exactly once", p.acksFor(1) === 1, `acks=${p.acksFor(1)}`);
+  check("session: sessionOpened() true", typeof ss.sessionOpened === "function" && ss.sessionOpened() === true);
+  const r = await ss.readPreset(0);
+  check("session: needsSession read after hello() -> preset", r && r.length === 1128, String(r));
+  check("session: ident ACK still sent once after the read", p.acksFor(1) === 1);
+  ss.close();
+}
+{ // the symptom the fix prevents: ACK, then silence -> reads as an empty slot
+  const p = fakePedal({ needsSession: true });
+  const ss = T.create(p.input, p.output, FAST);
+  check("session: needsSession read without hello() -> null (ACK then silence)", await ss.readPreset(0) === null);
+  check("session: nothing sent the session open by itself", !p.sent.some(isSessionOpen));
+  ss.close();
+}
+{ // the pedal ACKs the 0x0C but never sends its ident reply -> hello() false, bounded
+  const p = fakePedal({ needsSession: true, answersSession: false });
+  const ss = T.create(p.input, p.output, FAST);
+  const t1 = Date.now();
+  check("session: no ident reply -> hello() false", await ss.hello() === false);
+  check("session: no ident reply -> bounded", Date.now() - t1 < 1500, `${Date.now() - t1} ms`);
+  check("session: no ident reply -> sessionOpened() false", typeof ss.sessionOpened === "function" && ss.sessionOpened() === false);
+  check("session: no ident reply -> handshake + session open only, no ACK", p.sent.map(hex).join() === [MSG.hello, MSG.settings_read].map(hex).join(), p.sent.map(hex).join(" "));
+  ss.close();
+}
+{ // no handshake reply -> no session open is sent at all
+  const p = fakePedal({ dead: true });
+  const ss = T.create(p.input, p.output, FAST);
+  check("session: dead pedal -> hello() false", await ss.hello() === false);
+  check("session: dead pedal -> only the handshake went out", p.sent.length === 1 && isHelloReq(p.sent[0]));
+  ss.close();
+}
+{ // close() right as the handshake reply lands -> no session open goes out
+  let ss = null;
+  const p = fakePedal({ onHello: () => setTimeout(() => { p.deliver(MSG.hello_reply); ss.close(); }, 1) });
+  ss = T.create(p.input, p.output, FAST);
+  const ok = await ss.hello().then((v) => v, () => false);
+  await sleep(20);
+  check("session: closed after the handshake -> hello() false, no session open sent", ok === false && !p.sent.some(isSessionOpen), p.sent.map(hex).join(" "));
 }
 
 // --- silent slot with no ACK at all: hello decides empty vs dead --------------------
@@ -282,7 +342,7 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   const [info, info2] = await Promise.all([D.connect(), D.connect()]);
   check("concurrent connect() share one attempt", info2 && info2.key === "gp150" && D.isConnected());
   check("GP-150 port wins over GP-50", info.key === "gp150" && info.port === "GP-150", JSON.stringify(info));
-  check("connect said hello", p150.sent.length === 1 && hex(p150.sent[0]) === hex(MSG.hello) && p50.sent.length === 0);
+  check("connect said hello (+ session open, ident ACK)", p150.sent.map(hex).join() === HELLO_WIRE && p50.sent.length === 0, p150.sent.map(hex).join(" "));
   check("ht session exposed", !!(D._ht && D._ht()));
   const bad = Uint8Array.from(MSG.ident_reply); bad[2] ^= 0x01;
   for (let i = 0; i < 3; i++) p150.deliver(bad);
@@ -310,6 +370,12 @@ check("closed session refuses", await s.readPreset(0).then(() => false, (e) => /
   Object.defineProperty(globalThis, "navigator", { configurable: true, value: { requestMIDIAccess: async () => ({ inputs: portMap(mute.input), outputs: portMap(mute.output) }) } });
   check("silent handshake -> connect rejects", await D.connect().then(() => false, (e) => /handshake/.test(e.message)));
   check("silent handshake -> not connected", !D.isConnected());
+  // a pedal that answers the handshake but not the session open: connect fails, no read
+  const noSession = fakePedal({ needsSession: true, answersSession: false, name: "GP-150" });
+  Object.defineProperty(globalThis, "navigator", { configurable: true, value: { requestMIDIAccess: async () => ({ inputs: portMap(noSession.input), outputs: portMap(noSession.output) }) } });
+  const nsErr = await D.connect().then(() => null, (e) => e);
+  check("no session open -> connect rejects naming the session open", nsErr && /session open/.test(nsErr.message), nsErr && nsErr.message);
+  check("no session open -> not connected, no read attempted", !D.isConnected() && noSession.reads() === 0 && !noSession.sent.some(isPresetReq));
   Object.assign(T.DEFAULTS, saved);
 }
 

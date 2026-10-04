@@ -171,7 +171,7 @@
       ht = root.HtTransport.create(input, output);
       let ok = false;
       try { ok = await ht.hello(); } catch { ok = false; }
-      if (!ok) { disconnect(); throw new Error("GP-150 did not answer the handshake — unplug/replug USB or close Valeton Suite"); }
+      if (!ok) { disconnect(); throw new Error("GP-150 did not answer the handshake / session open — unplug/replug USB or close Valeton Suite"); }
     }
     return { key: profile.key, name: profile.name, port: input.name };
   }

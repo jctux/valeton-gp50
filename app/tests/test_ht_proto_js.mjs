@@ -61,6 +61,18 @@ check("shortPayload 0x08 notify", note.family === HT.FAMILY_IMPORT_DONE && note.
 check("shortPayload refuses a chunk", throws(() => HT.shortPayload(HT.parseFrame(MSG.import_stream_slot1_0))));
 check("shortPayload refuses an ACK", throws(() => HT.shortPayload(HT.parseFrame(MSG.import_done_ack))));
 
+// session open (2026-10-04): a power-cycled GP-150 ACKs reads but streams nothing
+// until it has seen the Suite's family-0x0C message; it answers ack_tx0 + ident_reply
+check("session constants", HT.FAMILY_SESSION === 0x0c && HT.FAMILY_IDENT === 0x10 && hex(HT.SESSION_OPEN_PAYLOAD || []) === "0301701070100200");
+check("sessionOpen == corpus settings_read", typeof HT.sessionOpen === "function" && hex(HT.sessionOpen()) === hex(MSG.settings_read), typeof HT.sessionOpen === "function" ? hex(HT.sessionOpen()) : "no sessionOpen");
+check("sessionOpen payload", typeof HT.sessionOpen === "function" && hex(HT.shortPayload(HT.parseFrame(HT.sessionOpen()))) === "0301701070100200");
+const isIdent = (id) => typeof HT.isIdentReply === "function" && HT.isIdentReply(HT.parseFrame(MSG[id]));
+check("isIdentReply: corpus ident_reply", isIdent("ident_reply") === true);
+check("isIdentReply: not the hello reply", typeof HT.isIdentReply === "function" && isIdent("hello_reply") === false);
+check("isIdentReply: not ack_tx0", typeof HT.isIdentReply === "function" && isIdent("ack_tx0") === false);
+check("isIdentReply: not a chunk", typeof HT.isIdentReply === "function" && isIdent("export_stream_slot1_0") === false);
+check("ident_reply carries tx 1", HT.parseFrame(MSG.ident_reply).tx4.join() === "0,0,0,1");
+
 // python oracle: same bytes from patch/ht_proto.py
 const py = [".venv-app/bin/python", "python3"].map((p) => (p.includes("/") ? resolve(repoRoot, p) : p)).find((p) => !p.includes("/") || existsSync(p));
 const pyHex = execFileSync(py, ["-c", `
@@ -73,6 +85,13 @@ print(json.dumps([w.hex() for w in ht.import_stream(0x31, prst)]))
 const pyStream = JSON.parse(pyHex);
 const jsStream = HT.importStream(0x31, new Uint8Array(readFileSync(resolve(repoRoot, "re/gp150/evidence/099-Finger_AC.prst")))).map(hex);
 check("py/js import parity", JSON.stringify(pyStream) === JSON.stringify(jsStream));
+const pySession = execFileSync(py, ["-c", `
+import sys
+sys.path.insert(0, ${JSON.stringify(repoRoot)})
+from patch import ht_proto as ht
+print(ht.session_open().hex())
+`]).toString().trim();
+check("py/js session open parity", typeof HT.sessionOpen === "function" && pySession === hex(HT.sessionOpen()), pySession);
 
 console.log(`ht_proto.js: ${pass} passed, ${fail} failed`);
 for (const f of fails) console.log("  FAIL " + f);

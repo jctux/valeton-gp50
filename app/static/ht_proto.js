@@ -11,6 +11,11 @@
   const PRESET_LEN = 1128, IMPORT_BYTE_0A = 0x5c;
   const HEAD_EXPORT = [0x03, 0x03, 0x11, 0x30], HEAD_IMPORT = [0x01, 0x03, 0x11, 0x30];
   const IMPORT_DONE_PAYLOAD = [0x09, 0x03, 0x11, 0x30]; // logical payload of the pedal's 0x08 after an import
+  // The Suite's family-0x0C "session open", sent right after the handshake. A power-cycled
+  // GP-150 ACKs preset reads but streams nothing until it has seen it (2026-10-04); the
+  // pedal answers with an ACK (tx 0) and an ident reply (family 0x10, tx 1, ACKed by the host).
+  const FAMILY_SESSION = 0x0c, FAMILY_IDENT = 0x10;
+  const SESSION_OPEN_PAYLOAD = [0x03, 0x01, 0x70, 0x10, 0x70, 0x10, 0x02, 0x00];
   const u8 = (b) => (b instanceof Uint8Array ? b : Uint8Array.from(b));
   const concat = (...arrs) => { const p = arrs.map(u8); const out = new Uint8Array(p.reduce((s, a) => s + a.length, 0)); let o = 0; for (const a of p) { out.set(a, o); o += a.length; } return out; };
   const eq4 = (a, b) => a.length >= 4 && b.every((v, i) => a[i] === v);
@@ -64,6 +69,8 @@
   const shortMessage = (family, txId, payload) => frame(family, [0, 0, 0, id7(txId, "tx id") & 0xff], concat([0x00], enc(logical(payload))));
   const hello = () => frame(FAMILY_ACK, [0x00, 0x01, 0x03, 0x00], [0x00]);
   const ack = (id) => frame(FAMILY_ACK, [0, 0, 0, id7(id, "ack id") & 0xff], [0x00]);
+  const sessionOpen = () => shortMessage(FAMILY_SESSION, 0, SESSION_OPEN_PAYLOAD);
+  const isIdentReply = (f) => f.family === FAMILY_IDENT && !isChunk(f);
   function presetRequest(txId, slot, select = false) {
     if (!(slot >= 0 && slot <= 0xffff)) throw new Error(`slot out of range: ${slot}`);
     return shortMessage(FAMILY_PRESET_REQ, txId, [0x03, 0x03, 0x11, 0x30, 0x11, 0x30, 0x02, 0x00, slot & 0xff, (slot >> 8) & 0xff, select ? 0x00 : 0x01]);
@@ -106,6 +113,6 @@
   }
   const importStream = (transferId, prst) => chunkFrames(FAMILY_PATCH, transferId, logical(importPayload(prst)), true);
 
-  const API = { crc8_31, ocrc, icrc, enc, dec, logical, parseLogical, frame, parseFrame, isChunk, chunkFields, shortPayload, shortMessage, hello, ack, presetRequest, assembleStream, presetFromPayload, importPayload, chunkFrames, importStream, SLOT_ACTIVE, FAMILY_ACK, FAMILY_PRESET_REQ, FAMILY_PATCH, FAMILY_IMPORT_DONE, FULL_WIRE_LEN, PRESET_LEN, CHUNK, OFFSET_STEP, IMPORT_BYTE_0A, HEAD_IMPORT, HEAD_EXPORT, IMPORT_DONE_PAYLOAD };
+  const API = { crc8_31, ocrc, icrc, enc, dec, logical, parseLogical, frame, parseFrame, isChunk, chunkFields, shortPayload, shortMessage, hello, ack, sessionOpen, isIdentReply, presetRequest, assembleStream, presetFromPayload, importPayload, chunkFrames, importStream, SLOT_ACTIVE, FAMILY_ACK, FAMILY_PRESET_REQ, FAMILY_PATCH, FAMILY_IMPORT_DONE, FAMILY_SESSION, FAMILY_IDENT, SESSION_OPEN_PAYLOAD, FULL_WIRE_LEN, PRESET_LEN, CHUNK, OFFSET_STEP, IMPORT_BYTE_0A, HEAD_IMPORT, HEAD_EXPORT, IMPORT_DONE_PAYLOAD };
   if (typeof module !== "undefined" && module.exports) module.exports = API; else root.HtProto = API;
 })(typeof self !== "undefined" ? self : this);
