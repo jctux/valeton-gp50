@@ -51,7 +51,13 @@ ENGINE_OVERRIDES = {
     (8, 41): 0x01, (8, 54): 0x01,
     (7, 25): 0x04,
 }
-ENGINE_BYPASS = 0x06
+ENGINE_BYPASS = 0x06  # engine of the "None" effect, at any chain position (corpus)
+VOL_SLOT = 11  # VOL's real type 3 ("Volume") also carries engine 0x06 at position 11
+# Slots whose type 3 is the "None" effect: the spec (App. A) has no real type 3 there,
+# and the catalog ring has a per-slot "None" entry (slot<<24 | 3). AMP/DST/DLY/RVB/VOL
+# have a real type 3, so a None block there is told apart only by engine 0x06.
+NONE_TYPE = 3
+NONE_SLOTS = (0, 1, 2, 4, 6, 7, 8)
 
 
 def detect(b: bytes) -> bool:
@@ -155,7 +161,10 @@ def engine_for(pos: int, slot: int, type_: int, params: Sequence[float]) -> int:
     """Engine byte for a block at chain position `pos`. Engines are written by the
     firmware (a disabled block keeps its engine); this is only used when a block's
     type or position changes. AMP (pos 0) rules are best effort (spec 6-7); else the
-    (slot, type) overrides; else the canonical engine of the chain position."""
+    (slot, type) overrides; else the canonical engine of the chain position. The
+    "None" model (type 3 in NONE_SLOTS) is engine 0x06 wherever it sits."""
+    if slot in NONE_SLOTS and type_ == NONE_TYPE:
+        return ENGINE_BYPASS
     if pos == 0:
         p = list(params) + [0.0] * N_PARAMS
         if type_ == 33 or type_ in (2, 7):
@@ -206,7 +215,9 @@ def _refresh_engine(b: bytearray, pos: int, slot: int) -> None:
 
 
 def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
-    """Explorer edit spec -> new bytes. Keys index blocks by SLOT (0..11)."""
+    """Explorer edit spec -> new bytes. Keys index blocks by SLOT (0..11). Engine
+    bytes are recomputed only for blocks whose model changed or that moved; a "None"
+    block (engine 0x06, not VOL) that only moved keeps engine 0x06."""
     _check(prst)
     edits = edits or {}
     b = bytearray(prst)
@@ -214,12 +225,13 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     if edits.get("order") is not None:
         write_order(b, edits["order"])
     order = read_order(b)
-    dirty = set(slot for pos, slot in enumerate(order) if old_order.index(slot) != pos)
+    moved = set(slot for pos, slot in enumerate(order) if old_order.index(slot) != pos)
+    remodeled = set()
     pos_of = {slot: pos for pos, slot in enumerate(order)}
     for slot, key in (edits.get("models") or {}).items():
         key = int(key)
         pos = pos_of[int(slot)]
-        dirty.add(int(slot))
+        remodeled.add(int(slot))
         set_block(b, pos, type=key & 0xFF, subtype=(key >> 8) & 0xFF, ext=(key >> 16) & 0xFF)
         if int(slot) == AMP_SLOT and (key & 0xFF) in (2, 7):
             set_block(b, pos, ext=1)
@@ -234,8 +246,11 @@ def apply_edits(prst: bytes, edits: Optional[Dict]) -> bytes:
     write_vol_bpm(b, s.get("patch_vol"), s.get("bpm"))
     if edits.get("name") is not None:
         write_name(b, str(edits["name"]))
-    for slot in sorted(dirty):
-        _refresh_engine(b, pos_of[slot], slot)
+    for slot in sorted(moved | remodeled):
+        pos = pos_of[slot]
+        if slot not in remodeled and slot != VOL_SLOT and b[_block_off(pos) + 7] == ENGINE_BYPASS:
+            continue  # a "None" block that only moved stays None (engine 0x06 at any position)
+        _refresh_engine(b, pos, slot)
     return bytes(b)
 
 

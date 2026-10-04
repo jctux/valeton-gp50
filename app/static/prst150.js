@@ -13,6 +13,10 @@
   const SLOTS = ["NR", "PRE", "WAH", "DST", "N->S", "AMP", "CAB", "EQ", "MOD", "DLY", "RVB", "VOL"];
   const AMP_SLOT = 5;
   const CANONICAL_ENGINE = [null, 0x05, 0x03, 0x07, 0x07, 0x00, 0x1a, 0x01, 0x04, 0x0b, 0x0c, 0x06];
+  // The "None" effect: engine 0x06 at any chain position (corpus). Type 3 is None in
+  // NONE_SLOTS (no real type 3 in the spec; the ring's per-slot "None" entries); AMP,
+  // DST, DLY, RVB and VOL have a real type 3. VOL's "Volume" also carries 0x06 at pos 11.
+  const ENGINE_BYPASS = 0x06, VOL_SLOT = 11, NONE_TYPE = 3, NONE_SLOTS = [0, 1, 2, 4, 6, 7, 8];
   const ENGINE_OVERRIDES = { "0:16": 0x1a, "3:117": 0x08, "3:118": 0x08, "3:122": 0x08, "4:57": 0x07, "4:64": 0x07, "4:122": 0x08, "4:112": 0x1a, "6:60": 0x0a, "1:26": 0x00, "8:41": 0x01, "8:54": 0x01, "7:25": 0x04 };
   const layout = {
     BLOCK_NAMES: SLOTS.slice(), MOVABLE_BLOCKS: new Set(SLOTS.filter((s) => s !== "AMP")),
@@ -58,6 +62,7 @@
   }
   // Engines are firmware-written; recomputed only when a block's type/position changes.
   function engineFor(pos, slot, type, params) {
+    if (type === NONE_TYPE && NONE_SLOTS.includes(slot)) return ENGINE_BYPASS;
     if (pos === 0) {
       const p = Array.from(params).concat(new Array(N_PARAMS).fill(0));
       if (type === 33 || type === 2 || type === 7) return 0x01;
@@ -82,11 +87,11 @@
     const b = Uint8Array.from(prst);
     const oldOrder = readOrder(b);
     if (edits.order != null) writeOrder(b, edits.order);
-    const order = readOrder(b), posOf = {}, dirty = new Set();
-    order.forEach((slot, pos) => { posOf[slot] = pos; if (oldOrder.indexOf(slot) !== pos) dirty.add(slot); });
+    const order = readOrder(b), posOf = {}, moved = new Set(), remodeled = new Set();
+    order.forEach((slot, pos) => { posOf[slot] = pos; if (oldOrder.indexOf(slot) !== pos) moved.add(slot); });
     for (const [slot, key] of Object.entries(edits.models || {})) {
       const k = Number(key) >>> 0, s = Number(slot), pos = posOf[s];
-      dirty.add(s);
+      remodeled.add(s);
       setBlock(b, pos, { type: k & 0xff, subtype: (k >> 8) & 0xff, ext: (k >> 16) & 0xff });
       if (s === AMP_SLOT && ((k & 0xff) === 2 || (k & 0xff) === 7)) setBlock(b, pos, { ext: 1 });
       if (s === 4 && (k & 0xff) === 0) setBlock(b, pos, { subtype: 1 });
@@ -96,7 +101,12 @@
     const s = edits.settings || {};
     writeVolBpm(b, s.patch_vol, s.bpm);
     if (edits.name != null) writeName(b, String(edits.name));
-    for (const slot of Array.from(dirty).sort((x, y) => x - y)) refreshEngine(b, posOf[slot], slot);
+    for (const slot of Array.from(new Set([...moved, ...remodeled])).sort((x, y) => x - y)) {
+      const pos = posOf[slot];
+      // a "None" block that only moved stays None (engine 0x06 at any position)
+      if (!remodeled.has(slot) && slot !== VOL_SLOT && b[blockOff(pos) + 7] === ENGINE_BYPASS) continue;
+      refreshEngine(b, pos, slot);
+    }
     return b;
   }
   const BLANK_B64 = "ETBkBAAAAAAQMFgEABVIPP//DAAQDA8DAwMEECgAAMggMFAAeAAyAAAAAABOZXcgR0VOLgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwMDwDBQABAgMEBgcICQoLAAAAAAMAAAYAAMhCAABIQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAABQAASEIAAEhCAABIQgAASEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAADAAAgQQAAjEIAAKBCAACAPwAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAMAAAYAAEhCAABIQgAASEIAAEhCAABIQgAASEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAQAAABwAASEIAAEhCAABIQgAANEIAAEhCAABcQgAASEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAAhAAAAAAAgQQAAQEEAAIA/AABIQwAAyEIAAEDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAABABABoAAAAAAACCQgAAAAAAAAAAAAAAAAAAmEEACDVGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAwAABgAAyEIAAAAAAAAAAAAAAAAAAAAAAABIQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADAAAGAADIQgAAAD8AAEhCAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAAAAAsAACBBAIDZQwAAoEEAAAAAAACAPwAASEIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAQAADAAAcEEAAEhCAAAgQgAAgD8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAEAAAADAAAGAADIQgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUDAMAAwAAAANAAAABAAAAGAwcAALAAAAAAAAAAAAyEL//wAAAAAAAAAAyEL//wAAAAAAAAAAyEIBAAAAAAAAAAAAyEL//wAAAAAAAAAAyEL//wAAAAAAAAAAyEL//wAAAAAAAAAAyEL//wAAAAAAAAAAyEL//wAAAAAAAAAAyEIAAAAAcDAEAAAAAACAMCQAdA4AAAQAAAAAAgAAAAAAAAAAAAABAAAAAQAAAAAAAAAAAAAA"; // same string as patch/prst150_format.BLANK_B64 (factory "New GEN.")
@@ -105,6 +115,7 @@
 
   const API = {
     key: "gp150", layout, MAGIC, PRST_LEN, NAME_OFF, NAME_LEN, ORDER_OFF, BLOCKS_OFF, BLOCK_LEN, N_BLOCKS, N_PARAMS, FOOTER_OFF, SLOTS, AMP_SLOT,
+    ENGINE_BYPASS, NONE_TYPE, NONE_SLOTS,
     detect, readIndex, writeIndex, readName, writeName, readVolBpm, writeVolBpm, readOrder, writeOrder, isPermutation,
     blockAt, blocksBySlot, setBlock, setParam, engineFor, modelKey, modelRecords, modelRecOffset, bypassMask, paramFloats,
     fsOffset, readFootswitches, refixCrc, applyEdits, blankPrst, BLANK_B64,

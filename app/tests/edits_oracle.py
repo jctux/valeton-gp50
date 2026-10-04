@@ -1,6 +1,10 @@
 """Emit expected apply-edits results for the in-repo corpus, as a JSON manifest.
 The JS port (app/static/prst.js applyEdits) is checked byte-for-byte against this
 by app/tests/test_edits_js.mjs.
+
+GP-150 presets (re/gp150/evidence/) are edited by their own codec,
+patch/prst150_format.apply_edits, with an edit spec keyed by SLOT index (0..11);
+the JS side routes through PRST.codecFor(PRST.detect(base)).applyEdits.
 """
 
 import base64
@@ -14,6 +18,7 @@ ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 sys.path.insert(0, ROOT)
 
 from app import patchlib  # noqa: E402
+from patch import prst150_format as f150  # noqa: E402
 from patch import prst_format as fmt  # noqa: E402
 
 # A spread of edit specs exercising every branch of apply_edits_bytes.
@@ -53,6 +58,27 @@ EDIT_SETS = [
 ]
 
 
+# GP-150: one combined edit, keys are slot indexes (Explorer block index == slot):
+# AMP param 0, RVB off, DLY model -> type 4, rename, VOL/BPM, RVB moved right after AMP.
+GP150_EDIT_SETS = [
+    {
+        "label": "gp150-combined",
+        "edits": {
+            "params": {"5": {"0": 33.0}},
+            "bypass": {"10": False},
+            "models": {"9": f150.model_key(9, 4)},
+            "name": "Oracle",
+            "settings": {"patch_vol": 60, "bpm": 100},
+            "order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11],
+        },
+    },
+]
+
+
+def gp150_corpus() -> list[str]:
+    return sorted(glob.glob(os.path.join(ROOT, "re", "gp150", "evidence", "*.prst")))
+
+
 def corpus() -> list[str]:
     paths = sorted(glob.glob(os.path.join(ROOT, "presetExports", "*.prst")))[:12]
     paths += sorted(
@@ -81,6 +107,24 @@ def records() -> list:
                     "edits": es["edits"],
                     "baseB64": base64.b64encode(base).decode(),
                     "editedB64": base64.b64encode(bytes(b)).decode(),
+                }
+            )
+    for path in gp150_corpus():
+        with open(path, "rb") as fh:
+            base = fh.read()
+        src = fmt.detect(base)
+        if src.key != "gp150":
+            continue
+        for es in GP150_EDIT_SETS:
+            edited = f150.apply_edits(base, copy.deepcopy(es["edits"]))
+            out.append(
+                {
+                    "path": os.path.relpath(path, ROOT),
+                    "srcKey": src.key,
+                    "label": es["label"],
+                    "edits": es["edits"],
+                    "baseB64": base64.b64encode(base).decode(),
+                    "editedB64": base64.b64encode(edited).decode(),
                 }
             )
     return out

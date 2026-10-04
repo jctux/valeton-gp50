@@ -32,10 +32,13 @@ for (const rec of O.files) {
   check(`${rec.path} floats`, near(P.paramFloats(b), rec.floats));
   const edited = P.applyEdits(b, edit);
   check(`${rec.path} applyEdits`, eq(edited, fromB64(rec.editedB64)));
+  check(`${rec.path} applyEdits None models`, eq(P.applyEdits(b, O.editNone), fromB64(rec.editedNoneB64)));
   check(`${rec.path} applyEdits noop`, eq(P.applyEdits(b, {}), b));
   check(`${rec.path} input untouched`, eq(b, fromB64(rec.prstB64)));
 }
 check("blank 199", eq(P.blankPrst(199), fromB64(O.blank199B64)));
+check("NONE_SLOTS mirror", JSON.stringify(P.NONE_SLOTS) === "[0,1,2,4,6,7,8]" && P.NONE_TYPE === 3);
+check("engineFor None", (P.NONE_SLOTS || []).length === 7 && P.NONE_SLOTS.every((s) => [1, 5, 11].every((pos) => P.engineFor(pos, s, 3, []) === 0x06)) && P.engineFor(4, 3, 3, []) === 0x07);
 let threw = false; try { P.writeOrder(fromB64(O.files[0].prstB64), [0, 5, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11]); } catch { threw = true; }
 check("writeOrder requires AMP first", threw);
 console.log(`prst150.js: ${pass} passed, ${fail} failed (${O.files.length} files)`);

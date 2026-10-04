@@ -157,6 +157,57 @@ def test_apply_edits_reorder_recomputes_moved_engines():
     assert rvb["pos"] == 1 and rvb["engine"] == f150.engine_for(1, 10, rvb["type"], rvb["params"])
 
 
+def test_engine_for_none_model():
+    # type 3 is the "None" effect in the slots whose spec has no real type 3 (the
+    # ring's per-slot None entries): engine 0x06 at any position (corpus encoding).
+    for slot in f150.NONE_SLOTS:
+        for pos in range(1, 12):
+            assert f150.engine_for(pos, slot, f150.NONE_TYPE, [0.0] * 15) == 0x06, (slot, pos)
+    assert set(f150.NONE_SLOTS) == {0, 1, 2, 4, 6, 7, 8}
+    # DST/DLY/RVB/VOL have a REAL type 3 (Penesas OD, Dual Echo, Spring, Volume)
+    assert f150.engine_for(4, 3, 3, [0.0] * 15) == 0x07
+    assert f150.engine_for(9, 9, 3, [0.0] * 15) == 0x0B
+    assert f150.engine_for(10, 10, 3, [0.0] * 15) == 0x0C
+
+
+def test_apply_edits_moved_none_blocks_stay_none():
+    # "It's GP-150" (the factory placeholder): NR PRE WAH DST N->S CAB are None
+    # (type 3, engine 0x06). Moving RVB right after AMP shifts all of them; they must
+    # stay None, not pick up the new position's engine (DST type 3 + engine 0x00 is a
+    # real drive). Real blocks that moved are still recomputed.
+    b = _active()
+    before = f150.blocks_by_slot(b)
+    out = f150.apply_edits(b, {"order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11]})
+    after = f150.blocks_by_slot(out)
+    for s in (0, 1, 2, 3, 4, 6):
+        assert before[s]["engine"] == 0x06 and after[s]["pos"] == before[s]["pos"] + 1, s
+        assert (after[s]["type"], after[s]["engine"]) == (before[s]["type"], 0x06), s
+    for s in (7, 8, 9, 10):
+        blk = after[s]
+        assert blk["engine"] == f150.engine_for(blk["pos"], s, blk["type"], blk["params"]), s
+    assert after[11] == before[11]  # VOL did not move
+
+
+def test_apply_edits_model_to_none_and_back():
+    b = _active()
+    # MOD (slot 8, type 41) -> the ring's MOD "None" entry: type 3 + engine 0x06
+    out = f150.apply_edits(b, {"models": {8: f150.model_key(8, 3)}})
+    mod = f150.blocks_by_slot(out)[8]
+    assert (mod["type"], mod["engine"]) == (3, 0x06)
+    # NR is None; picking Gate (type 1) gives the position's real engine
+    out = f150.apply_edits(b, {"models": {0: f150.model_key(0, 1)}})
+    nr = f150.blocks_by_slot(out)[0]
+    assert (nr["type"], nr["engine"]) == (1, f150.engine_for(nr["pos"], 0, 1, nr["params"])) and nr["engine"] != 0x06
+    # DST None -> DST type 3 (Penesas OD, a real effect): real engine, not None
+    out = f150.apply_edits(b, {"models": {3: f150.model_key(3, 3)}})
+    dst = f150.blocks_by_slot(out)[3]
+    assert (dst["type"], dst["engine"]) == (3, 0x07)
+    # a None block that is both moved and re-modelled gets the new model's engine
+    out = f150.apply_edits(b, {"order": [5, 10, 0, 1, 2, 3, 4, 6, 7, 8, 9, 11], "models": {0: f150.model_key(0, 1)}})
+    nr = f150.blocks_by_slot(out)[0]
+    assert nr["pos"] == 2 and nr["engine"] == f150.engine_for(2, 0, 1, nr["params"])
+
+
 def test_blank_has_index_and_name():
     b = f150.blank(199)
     assert f150.detect(b) and f150.read_index(b) == 199 and f150.read_name(b) == "New GEN."
