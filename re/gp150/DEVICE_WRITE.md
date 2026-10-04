@@ -157,3 +157,18 @@ manual check (record the answer in re/gp150/DEVICE_WRITE.md):
 - pedal responsive afterwards: yes
 - (a) manual check — preset 200 on the display shows "It's GP-150" and plays: YES (user, 2026-10-04 08:04: "shows It's GP-150 and sounds fine, as other It's GP-150 tones")
 - **Gate:** `device_write.WRITE_VERIFIED["gp150"] = True` as of this run. The browser gate (`webmidi_write.WRITE_VERIFIED.gp150`) stays false until Task 13 makes the Explorer's edit flows use the GP-150 codec.
+
+## Task 13 browser/edit checklist — 2026-10-04 (slot 199, user at the pedal)
+
+| Step | Result |
+|---|---|
+| rename (13 chars, Keep changes) | PASS — read-back == expected except 0x0E/0x0F; display updated at once |
+| header Patch VOL 50→60 + DLY → Sweet Echo + on (Live edit, Keep) | PASS — read-back == expected except 0x0E/0x0F and 0x445 (device enable bits); quieter, echo audible |
+| Clear preset (run on slot 185 by mistake) | PASS — slot == `f150.blank(185)` byte for byte |
+| reorder with the OLD codec (records moved, engines by position) | **FAIL** — loud click, no sound (engine 0x0C on the delay record); with 0x0B: sound but inert delay. Slot restored from the step-3 bytes |
+| pedal's own reorder (RVB moved, saved on the pedal) | changed only the order table 0x7E..0x82 → codec corrected (fixed home records, order-table-only reorder) |
+| reorder with the CORRECTED codec (DLY right after AMP) | PASS — read-back == expected except 0x0E/0x0F; echo present; Explorer (after hard reload + rescan) shows the stored order |
+| select (flag 00) | PASS — pedal switches, 0x18 + stream pushed |
+| restore 199 and 185 from the scan backup | PASS — both read back byte-identical; active preset left on slot 100 |
+
+Findings: byte 0x445 = enable bits (MOD, DLY, RVB, VOL), 0x43C = "saved on the pedal" flag, both device-written; an import into the ACTIVE slot does not refresh the live preset until re-selected (§8.2); the pedal's chain screen draws AMP in a fixed middle position; an accidental power-off lost nothing (imports are persisted immediately). The chain-strip drag did not work in the user's Chrome (works in automated Chromium) — UX follow-up.
