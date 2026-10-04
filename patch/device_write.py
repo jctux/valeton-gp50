@@ -45,7 +45,7 @@ from patch.prst_format import (  # noqa: E402
 # re/DEVICE_WRITE.md. The GP-150 (HT import stream, below) is byte-exact against
 # Suite's capture but has never been sent to a GP-150: refused until the
 # supervised hardware write (plan Task 12) passes.
-WRITE_VERIFIED = {"gp50": True, "gp5": False, "gp150": False}
+WRITE_VERIFIED = {"gp50": True, "gp5": False, "gp150": True}  # gp150: verified on hardware 2026-10-04 (re/gp150/DEVICE_WRITE.md)
 
 
 def build_packet(cmd: int, index: int, payload: bytes) -> list:

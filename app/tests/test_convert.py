@@ -190,4 +190,4 @@ def test_send_gate_refuses_unverified_gp5():
 
 
 def test_write_verified_map():
-    assert dw.WRITE_VERIFIED == {"gp50": True, "gp5": False, "gp150": False}
+    assert dw.WRITE_VERIFIED == {"gp50": True, "gp5": False, "gp150": True}  # GP-150: verified on hardware 2026-10-04 (re/gp150/DEVICE_WRITE.md)

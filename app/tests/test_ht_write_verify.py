@@ -306,7 +306,7 @@ def test_all_six_steps_pass_with_exactly_one_ack_per_0x08(monkeypatch, midi_port
     for a, k in calls:
         assert a[0] is None and k["session"] is s
         assert k["confirm"] is True and k["validated"] is True and k["allow_unverified"] is True
-    assert dw.WRITE_VERIFIED["gp150"] is False
+    assert dw.WRITE_VERIFIED["gp150"] is True  # flipped after the 2026-10-04 hardware run; the script still passes allow_unverified
 
     # backed up before the first write: the active preset + exactly what went to 199
     sent = bytearray(want)

@@ -154,5 +154,6 @@ manual check (record the answer in re/gp150/DEVICE_WRITE.md):
 - step 2 status: slot held the scanned placeholder (placeholder mode; empty-slot statuses not applicable)
 - backups: device_scan_gp150/write_verify_backup/100-Nothin_GT1.prst, 199-WRITE_TEST.prst (+ the full scan under device_scan_gp150/)
 - `[warn]`/`[debug]` lines: none
-- pedal responsive afterwards: _(fill in)_
-- (a) manual check — preset 200 on the display shows "It's GP-150" and plays: _(fill in)_
+- pedal responsive afterwards: yes
+- (a) manual check — preset 200 on the display shows "It's GP-150" and plays: YES (user, 2026-10-04 08:04: "shows It's GP-150 and sounds fine, as other It's GP-150 tones")
+- **Gate:** `device_write.WRITE_VERIFIED["gp150"] = True` as of this run. The browser gate (`webmidi_write.WRITE_VERIFIED.gp150`) stays false until Task 13 makes the Explorer's edit flows use the GP-150 codec.

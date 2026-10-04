@@ -365,19 +365,20 @@ def send(pk, pedal, **kw):
     return dw.send_stream(None, pk, **opts)
 
 
-def test_send_gate_refuses_unverified_gp150():
+def test_send_gate_allows_verified_gp150():
+    """Verified on hardware 2026-10-04 (slot 199 round trip, re/gp150/DEVICE_WRITE.md):
+    the Python gate is open, so a validated GP-150 stream sends WITHOUT allow_unverified.
+    confirm=True is still required, and the default (no session) path still never opens
+    a real port under test (conftest's guard)."""
     pk = good_stream()
-    assert dw.WRITE_VERIFIED["gp150"] is False
+    assert dw.WRITE_VERIFIED["gp150"] is True
     p = ImportPedal()
-    with pytest.raises(RuntimeError, match="not.*verified"):
-        dw.send_stream(None, pk, confirm=True, validated=True, session=session(p))
-    assert p.sent == []  # refused before a single byte
-    # the default path refuses before it ever looks for a MIDI port
-    with pytest.raises(RuntimeError, match="not.*verified"):
-        dw.send_stream("GP-150", pk, confirm=True, validated=True)
+    res = dw.send_stream(None, pk, confirm=True, validated=True, session=session(p))
+    assert res["notified"] and res["sent"] == len(pk) and len(p.sent) == len(pk) + 1  # chunks + the 0x08 ACK
+    q = ImportPedal()
     with pytest.raises(RuntimeError, match="confirm"):
-        dw.send_stream(None, pk, validated=True, allow_unverified=True, session=session(p))
-    assert p.sent == []
+        dw.send_stream(None, pk, validated=True, session=session(q))
+    assert q.sent == []
 
 
 def test_flipped_gate_without_a_session_still_never_opens_a_real_port(monkeypatch, midi_port_guard):
