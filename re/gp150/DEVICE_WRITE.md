@@ -135,11 +135,11 @@ Pedal had NO empty slot (slots 111..199 = 89 byte-identical factory "It's GP-150
 
 ```
 GP-150 write verification: target slot 199 (display 200), source slot 0, WRITE_VERIFIED['gp150'] = False (this run passes allow_unverified)
-0 PASS scan precondition (placeholder) — /Users/jc/Music/valeton-gp50/device_scan_gp150/scan_summary.json (2026-10-04 07:44): slot 199 holds the factory placeholder "It's GP-150", byte-identical (except 0x04) to 88 other slots e.g. [111, 112, 113, 114, 115]; the original is restored in step 5
+0 PASS scan precondition (placeholder) — device_scan_gp150/scan_summary.json (2026-10-04 07:44): slot 199 holds the factory placeholder "It's GP-150", byte-identical (except 0x04) to 88 other slots e.g. [111, 112, 113, 114, 115]; the original is restored in step 5
 1 PASS hello + read active — handshake answered; active preset index 100 'Nothin-GT1', 1128 bytes
 2 PASS target slot holds the scanned placeholder — slot 199 still holds the scanned placeholder index 199 "It's GP-150"
-  backup: active preset -> /Users/jc/Music/valeton-gp50/device_scan_gp150/write_verify_backup/100-Nothin_GT1.prst
-  backup: write-test preset (for slot 199) -> /Users/jc/Music/valeton-gp50/device_scan_gp150/write_verify_backup/199-WRITE_TEST.prst
+  backup: active preset -> device_scan_gp150/write_verify_backup/100-Nothin_GT1.prst
+  backup: write-test preset (for slot 199) -> device_scan_gp150/write_verify_backup/199-WRITE_TEST.prst
 3 PASS import WRITE TEST — copy of slot 0 (index 0 'New GEN.') renamed 'WRITE TEST' -> slot 199: 10 chunks sent, ACK, 0x08 'import done' received
 4 PASS read back == sent — read back index 199 'WRITE TEST' == sent; back[0x0A] = 0x58 (the import sent 0x5c); ignored differences: 0x00e 0x00f
 5 PASS restore the original — original index 199 "It's GP-150" written back: 10 chunks sent, ACK, 0x08 'import done' received; read back == original
